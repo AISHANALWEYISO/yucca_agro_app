@@ -12,7 +12,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _controller = PageController();
   int currentIndex = 0;
 
-  final Color logoGreen = const Color.fromARGB(255, 176, 189, 160); // green background
+  final Color logoGreen = const Color.fromARGB(255, 208, 218, 195); // green background
 
   @override
   Widget build(BuildContext context) {
@@ -24,17 +24,18 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         },
         children: [
           buildPage(
-            image: "assets/splash.jpeg",
+            image: "assets/splash2.png",
             title: "Welcome to Yucca Agro App",
-            desc: "Digitizing agricultural support and post-harvest services.",
+            desc: "Cultivating a Sustainable World.",
           ),
           buildPage(
-            image: "assets/logo.png",
+            image: "assets/foods.png",
             title: "Your Farming Partner",
-            desc: "Access services, market info, and expert support.",
+            desc: "Access services, crop info, and expert support.",
+           
           ),
           buildPage(
-            image: "assets/logo.png",
+            image: "assets/yucca.png",
             title: "Get Started",
             desc: "Click below to continue to the app.",
             isLast: true,
@@ -49,9 +50,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     required String title,
     required String desc,
     bool isLast = false,
+    bool useBackgroundImage = false, // new parameter
   }) {
     return Container(
-      color: logoGreen,
+      // Use image or color background
+      decoration: useBackgroundImage
+          ? BoxDecoration(
+              image: DecorationImage(
+                image: AssetImage(image), // background image
+                fit: BoxFit.cover,
+                colorFilter: ColorFilter.mode(
+                  Colors.black.withOpacity(0.3), // transparency overlay
+                  BlendMode.darken,
+                ),
+              ),
+            )
+          : BoxDecoration(
+              color: logoGreen,
+            ),
       padding: const EdgeInsets.all(30),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -60,7 +76,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Image.asset(image, height: 180),
+                // Only show image if not used as background
+                if (!useBackgroundImage) Image.asset(image, height: 180),
                 const SizedBox(height: 30),
                 Text(
                   title,
@@ -110,8 +127,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     // Navigate to AuthScreen
                     Navigator.pushReplacement(
                       context,
-                      MaterialPageRoute(
-                          builder: (context) => AuthScreen()),
+                      MaterialPageRoute(builder: (context) => AuthScreen()),
                     );
                   } else {
                     _controller.nextPage(

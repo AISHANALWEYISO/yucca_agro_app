@@ -10,7 +10,7 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  final Color bgFirst = const Color(0xFFE6F4E6); // soft light green
+  final Color bgFirst = const Color.fromARGB(255, 215, 223, 216); // soft light green
 
   @override
   void initState() {
@@ -34,12 +34,12 @@ class _SplashScreenState extends State<SplashScreen> {
           children: [
             Image.asset(
               "assets/logo.png", // your splash image/logo
-              width: 150,
-              height: 150,
+              width: 200,
+              height: 200,
             ),
             const SizedBox(height: 20),
             Text(
-              "Yucca Agro App",
+              "Yucca Agro",
               style: TextStyle(
                 fontSize: 24,
                 fontWeight: FontWeight.bold,
@@ -48,7 +48,7 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
             const SizedBox(height: 10),
             Text(
-              "Cultivating a Sustainable World.",
+              "",
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 16,

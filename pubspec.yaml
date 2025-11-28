@@ -24,4 +24,7 @@ flutter:
 
   assets:
     - assets/logo.png
-    - assets/splash.jpeg
+    - assets/foods.png
+    - assets/splash1.png
+    - assets/yucca.png
+    - assets/Splash2.png

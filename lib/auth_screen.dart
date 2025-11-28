@@ -1,7 +1,6 @@
 
-
 import 'package:flutter/material.dart';
-import 'forgot_password_screen.dart'; // import the forgot password screen
+import 'forgot_password_screen.dart';
 
 class AuthScreen extends StatefulWidget {
   @override
@@ -9,13 +8,21 @@ class AuthScreen extends StatefulWidget {
 }
 
 class _AuthScreenState extends State<AuthScreen> {
-  bool isLogin = true; // toggle between Sign In / Sign Up
+  bool isLogin = true;
+  bool showPassword = false;
+  bool showConfirmPassword = false;
+
   final _formKey = GlobalKey<FormState>();
 
-  // Controllers for input fields
+  // Controllers
   final TextEditingController emailController = TextEditingController();
   final TextEditingController passwordController = TextEditingController();
+  final TextEditingController confirmPasswordController =
+      TextEditingController();
   final TextEditingController nameController = TextEditingController();
+  final TextEditingController ageController = TextEditingController();
+
+  String? selectedUserType;
 
   final Color logoGreen = const Color(0xFF366000);
 
@@ -29,98 +36,137 @@ class _AuthScreenState extends State<AuthScreen> {
           child: Form(
             key: _formKey,
             child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                // App Logo
-                Image.asset("assets/logo.png", height: 120),
                 const SizedBox(height: 20),
 
                 Text(
                   isLogin ? "Sign In" : "Sign Up",
                   style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white),
+                    fontSize: 28,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
                 ),
+
                 const SizedBox(height: 20),
 
-                // Name field (only for Sign Up)
+                // NAME
                 if (!isLogin)
                   TextFormField(
                     controller: nameController,
-                    style: const TextStyle(color: Colors.black87),
-                    decoration: InputDecoration(
-                      hintText: "Full Name",
-                      filled: true,
-                      fillColor: Colors.white,
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(30),
-                        borderSide: BorderSide.none,
-                      ),
-                      contentPadding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 16),
-                    ),
+                    decoration: _inputDecoration("Full Name"),
                     validator: (value) {
                       if (!isLogin && (value == null || value.isEmpty)) {
-                        return "Please enter your name";
+                        return "Please enter your full name";
                       }
                       return null;
                     },
                   ),
                 if (!isLogin) const SizedBox(height: 15),
 
-                // Email field
+                // AGE
+                if (!isLogin)
+                  TextFormField(
+                    controller: ageController,
+                    keyboardType: TextInputType.number,
+                    decoration: _inputDecoration("Age"),
+                    validator: (value) {
+                      if (!isLogin && (value == null || value.isEmpty)) {
+                        return "Please enter your age";
+                      }
+                      return null;
+                    },
+                  ),
+                if (!isLogin) const SizedBox(height: 15),
+
+                // USER TYPE
+                if (!isLogin)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                    child: DropdownButtonFormField<String>(
+                      value: selectedUserType,
+                      decoration: const InputDecoration(
+                          border: InputBorder.none, hintText: "User Type"),
+                      items: ["Farmer", "Customer"]
+                          .map((type) => DropdownMenuItem(
+                                value: type,
+                                child: Text(type),
+                              ))
+                          .toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          selectedUserType = value;
+                        });
+                      },
+                      validator: (value) {
+                        if (!isLogin && value == null) {
+                          return "Please select a user type";
+                        }
+                        return null;
+                      },
+                    ),
+                  ),
+                if (!isLogin) const SizedBox(height: 15),
+
+                // EMAIL
                 TextFormField(
                   controller: emailController,
                   keyboardType: TextInputType.emailAddress,
-                  style: const TextStyle(color: Colors.black87),
-                  decoration: InputDecoration(
-                    hintText: "Email",
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(30),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 16),
-                  ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return "Please enter your email";
-                    }
-                    return null;
-                  },
+                  decoration: _inputDecoration("Email"),
+                  validator: (value) =>
+                      value!.isEmpty ? "Please enter your email" : null,
                 ),
+
                 const SizedBox(height: 15),
 
-                // Password field
+                // PASSWORD
                 TextFormField(
                   controller: passwordController,
-                  obscureText: true,
-                  style: const TextStyle(color: Colors.black87),
-                  decoration: InputDecoration(
-                    hintText: "Password",
-                    filled: true,
-                    fillColor: Colors.white,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(30),
-                      borderSide: BorderSide.none,
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                        horizontal: 20, vertical: 16),
+                  obscureText: !showPassword,
+                  decoration: _passwordDecoration(
+                    "Password",
+                    showPassword,
+                    () {
+                      setState(() {
+                        showPassword = !showPassword;
+                      });
+                    },
                   ),
-                  validator: (value) {
-                    if (value == null || value.isEmpty) {
-                      return "Please enter your password";
-                    }
-                    return null;
-                  },
+                  validator: (value) =>
+                      value!.isEmpty ? "Please enter your password" : null,
                 ),
+
+                const SizedBox(height: 15),
+
+                // CONFIRM PASSWORD
+                if (!isLogin)
+                  TextFormField(
+                    controller: confirmPasswordController,
+                    obscureText: !showConfirmPassword,
+                    decoration: _passwordDecoration(
+                      "Confirm Password",
+                      showConfirmPassword,
+                      () {
+                        setState(() {
+                          showConfirmPassword = !showConfirmPassword;
+                        });
+                      },
+                    ),
+                    validator: (value) {
+                      if (!isLogin && value != passwordController.text) {
+                        return "Passwords do not match";
+                      }
+                      return null;
+                    },
+                  ),
 
                 const SizedBox(height: 10),
 
-                // Forgot Password
+                // FORGOT PASSWORD
                 if (isLogin)
                   Align(
                     alignment: Alignment.centerRight,
@@ -141,12 +187,10 @@ class _AuthScreenState extends State<AuthScreen> {
 
                 const SizedBox(height: 20),
 
-                // Sign In / Sign Up Button
+                // SUBMIT BUTTON
                 ElevatedButton(
                   onPressed: () {
-                    if (_formKey.currentState!.validate()) {
-                      // TODO: handle authentication logic
-                    }
+                    if (_formKey.currentState!.validate()) {}
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
@@ -167,7 +211,7 @@ class _AuthScreenState extends State<AuthScreen> {
 
                 const SizedBox(height: 15),
 
-                // Switch between Sign In / Sign Up
+                // SWITCH
                 TextButton(
                   onPressed: () {
                     setState(() {
@@ -186,6 +230,44 @@ class _AuthScreenState extends State<AuthScreen> {
           ),
         ),
       ),
+    );
+  }
+
+  // Normal inputs
+  InputDecoration _inputDecoration(String hint) {
+    return InputDecoration(
+      hintText: hint,
+      filled: true,
+      fillColor: Colors.white,
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(30),
+        borderSide: BorderSide.none,
+      ),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+    );
+  }
+
+  // Password input with eye icon update
+  InputDecoration _passwordDecoration(
+      String hint, bool isVisible, VoidCallback onPressed) {
+    return InputDecoration(
+      hintText: hint,
+      filled: true,
+      fillColor: Colors.white,
+      suffixIcon: IconButton(
+        icon: Icon(
+          isVisible ? Icons.visibility : Icons.visibility_off,
+          color: Colors.grey[700],
+        ),
+        onPressed: onPressed,
+      ),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(30),
+        borderSide: BorderSide.none,
+      ),
+      contentPadding:
+          const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
     );
   }
 }
