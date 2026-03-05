@@ -13,7 +13,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   final PageController _controller = PageController();
   int currentIndex = 0;
 
-  final Color logoGreen = const Color.fromARGB(255, 189, 196, 180); // Consistent theme
+  final Color logoGreen = const Color.fromARGB(255, 255, 255, 255); // Consistent theme
 
   final List<Map<String, String>> pages = [
     {
@@ -68,7 +68,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         style: const TextStyle(
                           fontSize: 26,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
+                          color: Color.fromARGB(255, 39, 133, 30),
                         ),
                       ),
                       const SizedBox(height: 20),
@@ -77,7 +77,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         textAlign: TextAlign.center,
                         style: const TextStyle(
                           fontSize: 16,
-                          color: Color.fromARGB(179, 15, 15, 15),
+                          color: Color.fromARGB(179, 98, 100, 99),
                         ),
                       ),
                     ],
@@ -97,7 +97,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         },
                         child: const Text(
                           "Back",
-                          style: TextStyle(color: Colors.white, fontSize: 16),
+                          style: TextStyle(color: Color.fromARGB(255, 44, 39, 39), fontSize: 16),
                         ),
                       ),
                     const SizedBox(height: 10),
@@ -114,7 +114,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         }
                       },
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white.withOpacity(0.2),
+                        backgroundColor: const Color.fromARGB(255, 58, 50, 50).withOpacity(0.2),
                         padding: const EdgeInsets.symmetric(
                             horizontal: 50, vertical: 14),
                         shape: RoundedRectangleBorder(

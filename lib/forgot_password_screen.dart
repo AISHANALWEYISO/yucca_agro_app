@@ -13,7 +13,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
   final _formKey = GlobalKey<FormState>();
   final emailController = TextEditingController();
 
-  final Color primaryGreen = const Color.fromARGB(255, 201, 231, 162); // consistent green
+  final Color primaryGreen = const Color.fromARGB(255, 209, 216, 201); // consistent green
 
   @override
   Widget build(BuildContext context) {
@@ -34,7 +34,7 @@ class _ForgotPasswordScreenState extends State<ForgotPasswordScreen> {
               children: [
                 const Text(
                   "Enter your email to reset your password",
-                  style: TextStyle(color: Colors.white, fontSize: 18),
+                  style: TextStyle(color: Color.fromARGB(255, 0, 0, 0), fontSize: 18),
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 20),
