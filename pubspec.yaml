@@ -1,3 +1,5 @@
+
+
 # name: yucca_agro_app
 # description: "Mobile agro application for Yucca Consulting Limited."
 
@@ -11,8 +13,10 @@
 # dependencies:
 #   flutter:
 #     sdk: flutter
-
 #   cupertino_icons: ^1.0.8
+
+#   # Add this line to include shared_preferences
+#   shared_preferences: ^2.1.1
 
 # dev_dependencies:
 #   flutter_test:
@@ -28,12 +32,19 @@
 #     - assets/splash1.png
 #     - assets/yucca.png
 #     - assets/Splash2.png
+#     - assets/yucca1.png
+#     - assets/goats.jpg
+#     - assets/cattle.jpg
+#     - assets/poultry.jpg
+#     - assets/anthrax.jpg
+#     - assets/brucellosis.jpg
+#     - assets/fmd.jpg
+#     - assets/newcastle.jpg
+
 
 name: yucca_agro_app
 description: "Mobile agro application for Yucca Consulting Limited."
-
 publish_to: 'none'
-
 version: 1.0.0+1
 
 environment:
@@ -44,8 +55,28 @@ dependencies:
     sdk: flutter
   cupertino_icons: ^1.0.8
 
-  # Add this line to include shared_preferences
+  # ✅ HTTP for API calls to Flask backend
+  http: ^1.1.0
+  
+  # ✅ Environment variables (for API base URL)
+  flutter_dotenv: ^5.1.0
+  
+  # ✅ Local storage for simple data (you already have this)
   shared_preferences: ^2.1.1
+  
+  # ✅ State management (for auth, weather, tips)
+  provider: ^6.1.1
+  
+  # ✅ Secure storage for JWT tokens (login sessions)
+  flutter_secure_storage: ^9.0.0
+  
+  # ✅ Location services (for weather forecast)
+  geolocator: ^10.1.0
+  permission_handler: ^11.0.1
+  
+  # ✅ UI Utilities
+  intl: ^0.18.1              # Date formatting
+  cached_network_image: ^3.3.0  # Image caching for tips/diseases
 
 dev_dependencies:
   flutter_test:
@@ -69,6 +100,4 @@ flutter:
     - assets/brucellosis.jpg
     - assets/fmd.jpg
     - assets/newcastle.jpg
-
-
-
+    - .env                  
