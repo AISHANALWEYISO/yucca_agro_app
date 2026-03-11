@@ -1,15 +1,21 @@
-
 import 'dart:convert';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  // ✅ FIX: Use a getter for lazy loading + web fallback
   String get baseUrl {
-    // Try to get from dotenv, fallback to default for web
-    return dotenv.env['API_BASE_URL'] ?? 'http://localhost:5001/api';
+    if (kIsWeb) return 'http://localhost:5001/api';
+    try {
+      if (Platform.isAndroid) return 'http://192.168.1.85:5001/api';
+    } catch (_) {}
+    return 'http://localhost:5001/api';
   }
+
+  // ─────────────────────────────────────────
+  //  AUTH
+  // ─────────────────────────────────────────
 
   // 🔑 LOGIN
   Future<Map<String, dynamic>> login({
@@ -59,12 +65,12 @@ class ApiService {
           'password': password,
           'confirm_password': confirmPassword,
           'age': age,
-          'usertype': usertype,
+          'usertype': 'Farmer',
         }),
       );
 
       if (response.statusCode == 201) {
-        return {'success': true, 'message': 'Registration successful! Please login.'};
+        return {'success': true, 'message': 'Account created successfully! Please sign in.'};
       } else {
         final error = jsonDecode(response.body);
         return {'success': false, 'message': error['message'] ?? 'Registration failed'};
@@ -74,7 +80,85 @@ class ApiService {
     }
   }
 
-  // 🔓 LOGOUT
+  // ─────────────────────────────────────────
+  //  FORGOT PASSWORD / OTP
+  // ─────────────────────────────────────────
+
+  // 📧 SEND OTP
+  Future<Map<String, dynamic>> sendOtp({required String email}) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/forgot-password/send-otp'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email}),
+      ).timeout(const Duration(seconds: 15));
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return {'success': true, 'message': data['message']};
+      } else {
+        return {'success': false, 'message': data['message'] ?? 'Failed to send OTP'};
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: $e'};
+    }
+  }
+
+  // 🔐 VERIFY OTP
+  Future<Map<String, dynamic>> verifyOtp({
+    required String email,
+    required String otp,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/forgot-password/verify-otp'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({'email': email, 'otp': otp}),
+      ).timeout(const Duration(seconds: 15));
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200 && data['success'] == true) {
+        return {'success': true, 'message': data['message']};
+      } else {
+        return {'success': false, 'message': data['message'] ?? 'Invalid OTP'};
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: $e'};
+    }
+  }
+
+  // 🔒 RESET PASSWORD
+  Future<Map<String, dynamic>> resetPassword({
+    required String email,
+    required String newPassword,
+    required String confirmPassword,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/auth/forgot-password/reset'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode({
+          'email': email,
+          'new_password': newPassword,
+          'confirm_password': confirmPassword,
+        }),
+      ).timeout(const Duration(seconds: 15));
+
+      final data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        return {'success': true, 'message': data['message']};
+      } else {
+        return {'success': false, 'message': data['message'] ?? 'Password reset failed'};
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: $e'};
+    }
+  }
+
+  // ─────────────────────────────────────────
+  //  SESSION
+  // ─────────────────────────────────────────
+
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove('access_token');
@@ -83,19 +167,15 @@ class ApiService {
     await prefs.setBool('isLoggedIn', false);
   }
 
-  // ✅ Check if user is logged in
   Future<bool> isLoggedIn() async {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getBool('isLoggedIn') ?? false;
   }
 
-  // 👤 Get stored user data
   Future<Map<String, dynamic>?> getUser() async {
     final prefs = await SharedPreferences.getInstance();
     final userJson = prefs.getString('user');
-    if (userJson != null) {
-      return jsonDecode(userJson);
-    }
+    if (userJson != null) return jsonDecode(userJson);
     return null;
   }
 }

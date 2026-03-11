@@ -152,7 +152,7 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
         backgroundColor: const Color(0xFF2D5016),
         foregroundColor: Colors.white,
         title: const Text(
-          '🌱 Soil Scanner',
+          ' Soil Scanner',
           style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
         ),
         centerTitle: true,
@@ -229,7 +229,7 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
                 const Icon(Icons.landscape,
                     size: 64, color: Color(0xFF8BC34A)),
                 const SizedBox(height: 12),
-                const Text('Upload a photo of your soil',
+                const Text('Take or upload a photo of your soil',
                     style: TextStyle(
                         fontSize: 15,
                         color: Color(0xFF555555),
@@ -446,7 +446,7 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
 
   Widget _buildSoilInfo(SoilAnalysis a) {
     return _card(
-      title: '🪨 Soil Profile',
+      title: ' Soil Profile',
       child: Column(
         children: [
           _infoRow('Type', a.soilType),
@@ -465,7 +465,7 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
       'pH_estimate': '⚗️'
     };
     return _card(
-      title: '🧪 Estimated Nutrients',
+      title: 'Estimated Nutrients',
       child: Wrap(
         spacing: 10,
         runSpacing: 10,
@@ -510,7 +510,7 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
 
   Widget _buildCrops(List<CropRecommendation> crops) {
     return _card(
-      title: '🌾 Recommended Crops',
+      title: 'Recommended Crops',
       child: Column(
         children: crops.map((c) {
           final color = c.suitability == 'Excellent'
@@ -566,7 +566,7 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
 
   Widget _buildFertilizers(List<Fertilizer> fertilizers) {
     return _card(
-      title: '🧴 Recommended Fertilizers',
+      title: ' Recommended Fertilizers',
       child: Column(
         children: fertilizers
             .map((f) => Container(
@@ -616,7 +616,7 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
 
   Widget _buildTips(List<String> tips) {
     return _card(
-      title: '💡 Improvement Tips',
+      title: 'Improvement Tips',
       child: Column(
         children: tips
             .asMap()
@@ -663,7 +663,7 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('📋', style: TextStyle(fontSize: 22)),
+          const Text('', style: TextStyle(fontSize: 22)),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
