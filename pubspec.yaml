@@ -80,6 +80,7 @@ dependencies:
 
   # Image picker for soil scanner
   image_picker: ^1.0.4
+  
 
   # Environment variables (for API base URL)
   flutter_dotenv: ^5.1.0
