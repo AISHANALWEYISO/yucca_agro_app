@@ -5,7 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  // ✅ baseUrl as instance getter
+  // ── Base URL ──────────────────────────────────────────────────────────────
   String get baseUrl {
     if (kIsWeb) return 'http://localhost:5001/api';
     try {
@@ -14,9 +14,18 @@ class ApiService {
     return 'http://localhost:5001/api';
   }
 
-  // ─────────────────────────────────────────
+  // ── Shared Headers Helper ─────────────────────────────────────────────────
+  Future<Map<String, String>> _getHeaders() async {
+    final token = await getToken();
+    return {
+      'Content-Type': 'application/json',
+      if (token != null) 'Authorization': 'Bearer $token',
+    };
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
   //  AUTH
-  // ─────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> login({
     required String email,
@@ -32,10 +41,10 @@ class ApiService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('access_token', data['access_token']);
+        await prefs.setString('access_token',  data['access_token']);
         await prefs.setString('refresh_token', data['refresh_token']);
-        await prefs.setString('user', jsonEncode(data['user']));
-        await prefs.setBool('isLoggedIn', true);
+        await prefs.setString('user',          jsonEncode(data['user']));
+        await prefs.setBool('isLoggedIn',      true);
         return {'success': true, 'data': data};
       } else {
         final error = jsonDecode(response.body);
@@ -59,12 +68,12 @@ class ApiService {
         Uri.parse('$baseUrl/auth/register'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'name': name,
-          'email': email,
-          'password': password,
+          'name':             name,
+          'email':            email,
+          'password':         password,
           'confirm_password': confirmPassword,
-          'age': age,
-          'usertype': 'Farmer',
+          'age':              age,
+          'usertype':         'Farmer',
         }),
       );
 
@@ -130,8 +139,8 @@ class ApiService {
         Uri.parse('$baseUrl/auth/forgot-password/reset'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'email': email,
-          'new_password': newPassword,
+          'email':            email,
+          'new_password':     newPassword,
           'confirm_password': confirmPassword,
         }),
       ).timeout(const Duration(seconds: 15));
@@ -147,9 +156,9 @@ class ApiService {
     }
   }
 
-  // ─────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
   //  SESSION
-  // ─────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
 
   Future<void> logout() async {
     final prefs = await SharedPreferences.getInstance();
@@ -176,9 +185,9 @@ class ApiService {
     return prefs.getString('access_token');
   }
 
-  // ─────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
   //  PROFILE
-  // ─────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
 
   Future<String?> uploadProfileImage(File imageFile) async {
     try {
@@ -195,14 +204,11 @@ class ApiService {
       }
 
       request.files.add(
-        await http.MultipartFile.fromPath(
-          'profile_image',
-          imageFile.path,
-        ),
+        await http.MultipartFile.fromPath('profile_image', imageFile.path),
       );
 
       final streamedResponse = await request.send();
-      final response = await http.Response.fromStream(streamedResponse);
+      final response        = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -238,9 +244,9 @@ class ApiService {
           if (token != null) 'Authorization': 'Bearer $token',
         },
         body: jsonEncode({
-          if (name != null) 'name': name,
-          if (email != null) 'email': email,
-          if (phone != null) 'phone': phone,
+          if (name != null)         'name':          name,
+          if (email != null)        'email':         email,
+          if (phone != null)        'phone':         phone,
           if (profileImage != null) 'profile_image': profileImage,
         }),
       );
@@ -250,9 +256,9 @@ class ApiService {
       if (response.statusCode == 200) {
         final user = await getUser();
         if (user != null) {
-          if (name != null) user['name'] = name;
-          if (email != null) user['email'] = email;
-          if (phone != null) user['phone'] = phone;
+          if (name != null)         user['name']          = name;
+          if (email != null)        user['email']         = email;
+          if (phone != null)        user['phone']         = phone;
           if (profileImage != null) user['profile_image'] = profileImage;
           await prefs.setString('user', jsonEncode(user));
         }
@@ -265,95 +271,112 @@ class ApiService {
     }
   }
 
-  // ─────────────────────────────────────────
-  //  ✅ SOIL SCANNER CREDITS
-  // ─────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  //  SOIL SCANNER CREDITS
+  // ─────────────────────────────────────────────────────────────────────────
 
-  // 📖 Check Soil Scanner Credits
   Future<Map<String, dynamic>> checkSoilScannerCredits() async {
     try {
-      final token = await getToken();
-      
-      final response = await http.get(  // ✅ Use http.get (NOT _get)
+      final response = await http.get(
         Uri.parse('$baseUrl/user/soil-scanner-access'),
-        headers: {
-          'Content-Type': 'application/json',
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
+        headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
-      
+
       return jsonDecode(response.body);
     } catch (e) {
       return {'success': false, 'message': 'Connection error: $e'};
     }
   }
 
-  // ─────────────────────────────────────────
-  //  ✅ PAYMENT (Manual Mobile Money)
-  // ─────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  //  PAYMENT
+  // ─────────────────────────────────────────────────────────────────────────
 
-  // 📤 Initiate Payment (Submit Transaction ID)
+  // Get your MTN/Airtel numbers + packages from backend
+  Future<Map<String, dynamic>> getPaymentInfo() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/payment/info'),
+        headers: await _getHeaders(),
+      ).timeout(const Duration(seconds: 10));
+
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: $e'};
+    }
+  }
+
+  // Step 1: Create order → farmer gets email with instructions
   Future<Map<String, dynamic>> initiatePayment({
     required String package,
     required String paymentMethod,
     required String phoneNumber,
+  }) async {
+    try {
+      final response = await http.post(
+        Uri.parse('$baseUrl/payment/initiate'),
+        headers: await _getHeaders(),
+        body: jsonEncode({
+          'package':        package,
+          'payment_method': paymentMethod,
+          'phone_number':   phoneNumber,
+        }),
+      ).timeout(const Duration(seconds: 15));
+
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: $e'};
+    }
+  }
+
+  // Step 2: Farmer submits transaction ID from their MTN/Airtel SMS
+  Future<Map<String, dynamic>> submitTransactionId({
+    required String orderRef,
     required String transactionId,
   }) async {
     try {
-      final token = await getToken();
-      
-      final response = await http.post(  // ✅ Use http.post (NOT _post)
-        Uri.parse('$baseUrl/payment/initiate'),
-        headers: {
-          'Content-Type': 'application/json',
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
+      final response = await http.post(
+        Uri.parse('$baseUrl/payment/submit-transaction'),
+        headers: await _getHeaders(),
         body: jsonEncode({
-          'package': package,
-          'payment_method': paymentMethod,
-          'phone_number': phoneNumber,
+          'order_ref':      orderRef,
           'transaction_id': transactionId,
         }),
       ).timeout(const Duration(seconds: 15));
-      
+
       return jsonDecode(response.body);
     } catch (e) {
       return {'success': false, 'message': 'Connection error: $e'};
     }
   }
 
-  // 📖 Get User's Payment History
+  // Get farmer's payment history
   Future<Map<String, dynamic>> getPaymentHistory() async {
     try {
-      final token = await getToken();
-      
-      final response = await http.get(  // ✅ Use http.get (NOT _get)
+      final response = await http.get(
         Uri.parse('$baseUrl/payment/my-orders'),
-        headers: {
-          'Content-Type': 'application/json',
-          if (token != null) 'Authorization': 'Bearer $token',
-        },
+        headers: await _getHeaders(),
       ).timeout(const Duration(seconds: 10));
-      
+
       return jsonDecode(response.body);
     } catch (e) {
       return {'success': false, 'message': 'Connection error: $e'};
     }
   }
 
-  // ─────────────────────────────────────────
-  //  ✅ TIPS (VIEW-ONLY)
-  // ─────────────────────────────────────────
+  // ─────────────────────────────────────────────────────────────────────────
+  //  TIPS
+  // ─────────────────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> getAllTips({String? category}) async {
     try {
       String url = '$baseUrl/tips/';
-      if (category != null) {
-        url += '?category=$category';
-      }
-      
-      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
-      
+      if (category != null) url += '?category=$category';
+
+      final response = await http.get(
+        Uri.parse(url),
+      ).timeout(const Duration(seconds: 10));
+
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
@@ -369,7 +392,7 @@ class ApiService {
       final response = await http.get(
         Uri.parse('$baseUrl/tips/$tipId'),
       ).timeout(const Duration(seconds: 10));
-      
+
       if (response.statusCode == 200) {
         return jsonDecode(response.body);
       } else {
@@ -379,4 +402,4 @@ class ApiService {
       return {'success': false, 'message': 'Connection error: $e'};
     }
   }
-} // 
+}
