@@ -5,11 +5,11 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiService {
-  // ── Base URL ──────────────────────────────────────────────────────────────
+  // 🔧 CORRECTED: Use your actual PC IP from Flask console
   String get baseUrl {
     if (kIsWeb) return 'http://localhost:5001/api';
     try {
-      if (Platform.isAndroid) return 'http://192.168.1.85:5001/api';
+      if (Platform.isAndroid) return 'http://192.168.1.241:5001/api'; // ✅ Your IP
     } catch (_) {}
     return 'http://localhost:5001/api';
   }
@@ -41,10 +41,9 @@ class ApiService {
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
         final prefs = await SharedPreferences.getInstance();
-        await prefs.setString('access_token',  data['access_token']);
-        await prefs.setString('refresh_token', data['refresh_token']);
-        await prefs.setString('user',          jsonEncode(data['user']));
-        await prefs.setBool('isLoggedIn',      true);
+        await prefs.setString('access_token', data['data']['token'] ?? data['access_token']);
+        await prefs.setString('user', jsonEncode(data['data']['user'] ?? data['user']));
+        await prefs.setBool('isLoggedIn', true);
         return {'success': true, 'data': data};
       } else {
         final error = jsonDecode(response.body);
@@ -68,12 +67,12 @@ class ApiService {
         Uri.parse('$baseUrl/auth/register'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'name':             name,
-          'email':            email,
-          'password':         password,
+          'name': name,
+          'email': email,
+          'password': password,
           'confirm_password': confirmPassword,
-          'age':              age,
-          'usertype':         'Farmer',
+          'age': age,
+          'usertype': usertype ?? 'farmer',
         }),
       );
 
@@ -139,8 +138,8 @@ class ApiService {
         Uri.parse('$baseUrl/auth/forgot-password/reset'),
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'email':            email,
-          'new_password':     newPassword,
+          'email': email,
+          'new_password': newPassword,
           'confirm_password': confirmPassword,
         }),
       ).timeout(const Duration(seconds: 15));
@@ -208,7 +207,7 @@ class ApiService {
       );
 
       final streamedResponse = await request.send();
-      final response        = await http.Response.fromStream(streamedResponse);
+      final response = await http.Response.fromStream(streamedResponse);
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body);
@@ -244,9 +243,9 @@ class ApiService {
           if (token != null) 'Authorization': 'Bearer $token',
         },
         body: jsonEncode({
-          if (name != null)         'name':          name,
-          if (email != null)        'email':         email,
-          if (phone != null)        'phone':         phone,
+          if (name != null) 'name': name,
+          if (email != null) 'email': email,
+          if (phone != null) 'phone': phone,
           if (profileImage != null) 'profile_image': profileImage,
         }),
       );
@@ -256,9 +255,9 @@ class ApiService {
       if (response.statusCode == 200) {
         final user = await getUser();
         if (user != null) {
-          if (name != null)         user['name']          = name;
-          if (email != null)        user['email']         = email;
-          if (phone != null)        user['phone']         = phone;
+          if (name != null) user['name'] = name;
+          if (email != null) user['email'] = email;
+          if (phone != null) user['phone'] = phone;
           if (profileImage != null) user['profile_image'] = profileImage;
           await prefs.setString('user', jsonEncode(user));
         }
@@ -292,7 +291,6 @@ class ApiService {
   //  PAYMENT
   // ─────────────────────────────────────────────────────────────────────────
 
-  // Get your MTN/Airtel numbers + packages from backend
   Future<Map<String, dynamic>> getPaymentInfo() async {
     try {
       final response = await http.get(
@@ -306,7 +304,6 @@ class ApiService {
     }
   }
 
-  // Step 1: Create order → farmer gets email with instructions
   Future<Map<String, dynamic>> initiatePayment({
     required String package,
     required String paymentMethod,
@@ -317,9 +314,9 @@ class ApiService {
         Uri.parse('$baseUrl/payment/initiate'),
         headers: await _getHeaders(),
         body: jsonEncode({
-          'package':        package,
+          'package': package,
           'payment_method': paymentMethod,
-          'phone_number':   phoneNumber,
+          'phone_number': phoneNumber,
         }),
       ).timeout(const Duration(seconds: 15));
 
@@ -329,7 +326,6 @@ class ApiService {
     }
   }
 
-  // Step 2: Farmer submits transaction ID from their MTN/Airtel SMS
   Future<Map<String, dynamic>> submitTransactionId({
     required String orderRef,
     required String transactionId,
@@ -339,7 +335,7 @@ class ApiService {
         Uri.parse('$baseUrl/payment/submit-transaction'),
         headers: await _getHeaders(),
         body: jsonEncode({
-          'order_ref':      orderRef,
+          'order_ref': orderRef,
           'transaction_id': transactionId,
         }),
       ).timeout(const Duration(seconds: 15));
@@ -350,7 +346,6 @@ class ApiService {
     }
   }
 
-  // Get farmer's payment history
   Future<Map<String, dynamic>> getPaymentHistory() async {
     try {
       final response = await http.get(
@@ -365,62 +360,15 @@ class ApiService {
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  //  TIPS
+  //  TIPS ✅ CORRECTED ENDPOINTS
   // ─────────────────────────────────────────────────────────────────────────
 
   Future<Map<String, dynamic>> getAllTips({String? category}) async {
     try {
-      String url = '$baseUrl/tips/';
-      if (category != null) url += '?category=$category';
-
-      final response = await http.get(
-        Uri.parse(url),
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        return {'success': false, 'message': 'Failed to fetch tips'};
+      String url = '$baseUrl/'; // 👈 Tips use /api/
+      if (category != null && category != 'All') {
+        url += '?category=$category';
       }
-    } catch (e) {
-      return {'success': false, 'message': 'Connection error: $e'};
-    }
-  }
-
-  Future<Map<String, dynamic>> getTipById(int tipId) async {
-    try {
-      final response = await http.get(
-        Uri.parse('$baseUrl/tips/$tipId'),
-      ).timeout(const Duration(seconds: 10));
-
-      if (response.statusCode == 200) {
-        return jsonDecode(response.body);
-      } else {
-        return {'success': false, 'message': 'Tip not found'};
-      }
-    } catch (e) {
-      return {'success': false, 'message': 'Connection error: $e'};
-    }
-  }
-}
-  // ─────────────────────────────────────────────────────────────────────────
-  //  TIPS ✅ Simple & Error-Free
-  // ─────────────────────────────────────────────────────────────────────────
-
-  /// Get base URL (avoids getter issues in string interpolation)
-  String _getBase() {
-    if (kIsWeb) return 'http://localhost:5001/api';
-    if (Platform.isAndroid) return 'http://192.168.1.85:5001/api';
-    return 'http://localhost:5001/api';
-  }
-
-  /// Fetch all tips, optionally filtered by category
-  Future<Map<String, dynamic>> getAllTips({String? category}) async {
-    try {
-      final base = _getBase();
-      final url = category != null && category != 'All'
-          ? '$base/?category=$category'
-          : '$base/';
 
       final response = await http.get(
         Uri.parse(url),
@@ -436,12 +384,10 @@ class ApiService {
     }
   }
 
-  /// Fetch a single tip by ID
   Future<Map<String, dynamic>> getTipById(int tipId) async {
     try {
-      final base = _getBase();
       final response = await http.get(
-        Uri.parse('$base/$tipId'),
+        Uri.parse('$baseUrl/$tipId'), // 👈 /api/1, /api/2, etc.
         headers: {'Content-Type': 'application/json'},
       ).timeout(const Duration(seconds: 15));
 
@@ -454,10 +400,343 @@ class ApiService {
     }
   }
 
-  /// Helper: Convert backend relative image URL to full URL for Flutter
+  // ─────────────────────────────────────────────────────────────────────────
+  //  DISEASES ✅ FIXED: Use /api/diseases/ prefix
+  // ─────────────────────────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> getDiseases({String? search}) async {
+    try {
+      String url = '$baseUrl/diseases/'; // 👈 Added /diseases/
+      if (search != null && search.isNotEmpty) {
+        url += '?search=$search';
+      }
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return {'success': false, 'message': 'Failed to fetch diseases'};
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> getDiseaseById(int diseaseId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/diseases/$diseaseId'), // 👈 Added /diseases/
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return {'success': false, 'message': 'Disease not found'};
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> createDisease({
+    required String name,
+    String? description,
+    String? signs,
+    String? prevention,
+    String? treatment,
+    String? imageUrl,
+    File? imageFile,
+  }) async {
+    try {
+      final headers = await _getHeaders();
+
+      if (imageFile != null) {
+        var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/diseases/'));
+        request.headers.addAll(headers);
+        request.fields['name'] = name;
+        if (description != null) request.fields['description'] = description;
+        if (signs != null) request.fields['signs'] = signs;
+        if (prevention != null) request.fields['prevention'] = prevention;
+        if (treatment != null) request.fields['treatment'] = treatment;
+        request.files.add(await http.MultipartFile.fromPath('image', imageFile.path));
+
+        final streamedResponse = await request.send();
+        final response = await http.Response.fromStream(streamedResponse);
+        return jsonDecode(response.body);
+      } else {
+        final response = await http.post(
+          Uri.parse('$baseUrl/diseases/'),
+          headers: headers,
+          body: jsonEncode({
+            'name': name,
+            if (description != null) 'description': description,
+            if (signs != null) 'signs': signs,
+            if (prevention != null) 'prevention': prevention,
+            if (treatment != null) 'treatment': treatment,
+            if (imageUrl != null) 'image_url': imageUrl,
+          }),
+        ).timeout(const Duration(seconds: 15));
+
+        return jsonDecode(response.body);
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> updateDisease({
+    required int diseaseId,
+    String? name,
+    String? description,
+    String? signs,
+    String? prevention,
+    String? treatment,
+    String? imageUrl,
+    File? imageFile,
+  }) async {
+    try {
+      final headers = await _getHeaders();
+
+      if (imageFile != null) {
+        var request = http.MultipartRequest('PUT', Uri.parse('$baseUrl/diseases/$diseaseId'));
+        request.headers.addAll(headers);
+        if (name != null) request.fields['name'] = name;
+        if (description != null) request.fields['description'] = description;
+        if (signs != null) request.fields['signs'] = signs;
+        if (prevention != null) request.fields['prevention'] = prevention;
+        if (treatment != null) request.fields['treatment'] = treatment;
+        request.files.add(await http.MultipartFile.fromPath('image', imageFile.path));
+
+        final streamedResponse = await request.send();
+        final response = await http.Response.fromStream(streamedResponse);
+        return jsonDecode(response.body);
+      } else {
+        final response = await http.put(
+          Uri.parse('$baseUrl/diseases/$diseaseId'),
+          headers: headers,
+          body: jsonEncode({
+            if (name != null) 'name': name,
+            if (description != null) 'description': description,
+            if (signs != null) 'signs': signs,
+            if (prevention != null) 'prevention': prevention,
+            if (treatment != null) 'treatment': treatment,
+            if (imageUrl != null) 'image_url': imageUrl,
+          }),
+        ).timeout(const Duration(seconds: 15));
+
+        return jsonDecode(response.body);
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> deleteDisease(int diseaseId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/diseases/$diseaseId'),
+        headers: await _getHeaders(),
+      ).timeout(const Duration(seconds: 15));
+
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: $e'};
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  //  MARKET ✅ NEW ENDPOINTS: Use /api/market/ prefix
+  // ─────────────────────────────────────────────────────────────────────────
+
+  Future<Map<String, dynamic>> getMarketItems({
+    String? category,
+    String? search,
+    double? minPrice,
+    double? maxPrice,
+  }) async {
+    try {
+      String url = '$baseUrl/market/';
+      final params = <String, String>{};
+      if (category != null && category != 'All') params['category'] = category;
+      if (search != null && search.isNotEmpty) params['search'] = search;
+      if (minPrice != null) params['min_price'] = minPrice.toString();
+      if (maxPrice != null) params['max_price'] = maxPrice.toString();
+      
+      if (params.isNotEmpty) {
+        final query = params.entries.map((e) => '${e.key}=${Uri.encodeComponent(e.value)}').join('&');
+        url += '?$query';
+      }
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 15));
+
+      return response.statusCode == 200 
+          ? jsonDecode(response.body) 
+          : {'success': false, 'message': 'Failed to fetch items'};
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> getMarketItemById(int itemId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/market/$itemId'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 15));
+
+      return response.statusCode == 200 
+          ? jsonDecode(response.body) 
+          : {'success': false, 'message': 'Item not found'};
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> createMarketItem({
+    required String name,
+    required String category,
+    required double price,
+    String? description,
+    String unit = 'kg',
+    int quantityAvailable = 0,
+    String? sellerName,
+    String? sellerPhone,
+    String? sellerLocation,
+    String? imageUrl,
+    File? imageFile,
+  }) async {
+    try {
+      final headers = await _getHeaders();
+
+      if (imageFile != null) {
+        var request = http.MultipartRequest('POST', Uri.parse('$baseUrl/market/'));
+        request.headers.addAll(headers);
+        request.fields['name'] = name;
+        request.fields['category'] = category;
+        request.fields['price'] = price.toString();
+        if (description != null) request.fields['description'] = description;
+        request.fields['unit'] = unit;
+        request.fields['quantity_available'] = quantityAvailable.toString();
+        if (sellerName != null) request.fields['seller_name'] = sellerName;
+        if (sellerPhone != null) request.fields['seller_phone'] = sellerPhone;
+        if (sellerLocation != null) request.fields['seller_location'] = sellerLocation;
+        request.files.add(await http.MultipartFile.fromPath('image', imageFile.path));
+
+        final streamedResponse = await request.send();
+        final response = await http.Response.fromStream(streamedResponse);
+        return jsonDecode(response.body);
+      } else {
+        final response = await http.post(
+          Uri.parse('$baseUrl/market/'),
+          headers: headers,
+          body: jsonEncode({
+            'name': name,
+            'category': category,
+            'price': price,
+            if (description != null) 'description': description,
+            'unit': unit,
+            'quantity_available': quantityAvailable,
+            if (sellerName != null) 'seller_name': sellerName,
+            if (sellerPhone != null) 'seller_phone': sellerPhone,
+            if (sellerLocation != null) 'seller_location': sellerLocation,
+            if (imageUrl != null) 'image_url': imageUrl,
+          }),
+        ).timeout(const Duration(seconds: 15));
+
+        return jsonDecode(response.body);
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> updateMarketItem({
+    required int itemId,
+    String? name,
+    String? category,
+    double? price,
+    String? description,
+    String? unit,
+    int? quantityAvailable,
+    String? sellerName,
+    String? sellerPhone,
+    String? sellerLocation,
+    String? imageUrl,
+    File? imageFile,
+  }) async {
+    try {
+      final headers = await _getHeaders();
+
+      if (imageFile != null) {
+        var request = http.MultipartRequest('PUT', Uri.parse('$baseUrl/market/$itemId'));
+        request.headers.addAll(headers);
+        if (name != null) request.fields['name'] = name;
+        if (category != null) request.fields['category'] = category;
+        if (price != null) request.fields['price'] = price.toString();
+        if (description != null) request.fields['description'] = description;
+        if (unit != null) request.fields['unit'] = unit;
+        if (quantityAvailable != null) request.fields['quantity_available'] = quantityAvailable.toString();
+        if (sellerName != null) request.fields['seller_name'] = sellerName;
+        if (sellerPhone != null) request.fields['seller_phone'] = sellerPhone;
+        if (sellerLocation != null) request.fields['seller_location'] = sellerLocation;
+        request.files.add(await http.MultipartFile.fromPath('image', imageFile.path));
+
+        final streamedResponse = await request.send();
+        final response = await http.Response.fromStream(streamedResponse);
+        return jsonDecode(response.body);
+      } else {
+        final response = await http.put(
+          Uri.parse('$baseUrl/market/$itemId'),
+          headers: headers,
+          body: jsonEncode({
+            if (name != null) 'name': name,
+            if (category != null) 'category': category,
+            if (price != null) 'price': price,
+            if (description != null) 'description': description,
+            if (unit != null) 'unit': unit,
+            if (quantityAvailable != null) 'quantity_available': quantityAvailable,
+            if (sellerName != null) 'seller_name': sellerName,
+            if (sellerPhone != null) 'seller_phone': sellerPhone,
+            if (sellerLocation != null) 'seller_location': sellerLocation,
+            if (imageUrl != null) 'image_url': imageUrl,
+          }),
+        ).timeout(const Duration(seconds: 15));
+
+        return jsonDecode(response.body);
+      }
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: $e'};
+    }
+  }
+
+  Future<Map<String, dynamic>> deleteMarketItem(int itemId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/market/$itemId'),
+        headers: await _getHeaders(),
+      ).timeout(const Duration(seconds: 15));
+
+      return jsonDecode(response.body);
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: $e'};
+    }
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  //  HELPER: Convert backend relative image URL to full URL
+  // ─────────────────────────────────────────────────────────────────────────
+
   String getFullImageUrl(String? relativeUrl) {
     if (relativeUrl == null || relativeUrl.isEmpty) return '';
     if (relativeUrl.startsWith('http')) return relativeUrl;
-    final base = _getBase().replaceFirst('/api', '');
-    return '$base$relativeUrl';
+    // Remove /api from baseUrl to get root: http://192.168.1.241:5001
+    final root = baseUrl.replaceFirst('/api', '');
+    return '$root$relativeUrl';
   }
+}

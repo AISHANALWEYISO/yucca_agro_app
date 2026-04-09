@@ -10,32 +10,30 @@ class TipsScreen extends StatefulWidget {
 
 class _TipsScreenState extends State<TipsScreen> {
   final ApiService _api = ApiService();
-  List<Map<String, dynamic>> _tips = [];
+  List<Map<String, dynamic>> _allTips = [];
+  List<Map<String, dynamic>> _filteredTips = [];
   bool _isLoading = true;
   String? _errorMessage;
-  String _selectedCategory = 'All';
+  final TextEditingController _searchController = TextEditingController();
+  String _searchQuery = '';
 
-  // 🌐 Update this to match your PC's IP or localhost
-  static const String _serverRoot = 'http://192.168.1.85:5001';
+  static const String _serverRoot = 'http://192.168.1.241:5001';
 
   static const Color colorLogoGreen = Color(0xFF366000);
   static const Color colorCardGreen = Color(0xFFBCD9A2);
   static const Color colorBtnGreen = Color(0xFF427A43);
 
-  final List<String> _categories = [
-    'All',
-    'General',
-    'Planting',
-    'Pest Control',
-    'Harvesting',
-    'Soil Management',
-    'Irrigation'
-  ];
-
   @override
   void initState() {
     super.initState();
     _fetchTips();
+    _searchController.addListener(_onSearchChanged);
+  }
+
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchTips() async {
@@ -46,15 +44,14 @@ class _TipsScreenState extends State<TipsScreen> {
     });
 
     try {
-      final result = await _api.getAllTips(
-        category: _selectedCategory == 'All' ? null : _selectedCategory,
-      );
+      final result = await _api.getAllTips();
 
       if (!mounted) return;
 
       if (result['success'] == true) {
         setState(() {
-          _tips = List<Map<String, dynamic>>.from(result['data'] ?? []);
+          _allTips = List<Map<String, dynamic>>.from(result['data'] ?? []);
+          _filteredTips = _allTips;
           _isLoading = false;
         });
       } else {
@@ -72,22 +69,26 @@ class _TipsScreenState extends State<TipsScreen> {
     }
   }
 
-  // 🖼️ Local helper to fix backend image URLs
+  void _onSearchChanged() {
+    final query = _searchController.text.trim().toLowerCase();
+    setState(() {
+      _searchQuery = query;
+      if (query.isEmpty) {
+        _filteredTips = _allTips;
+      } else {
+        _filteredTips = _allTips.where((tip) {
+          final title = (tip['title'] ?? '').toLowerCase();
+          final content = (tip['content'] ?? '').toLowerCase();
+          return title.contains(query) || content.contains(query);
+        }).toList();
+      }
+    });
+  }
+
   String _getFullImageUrl(String? relativeUrl) {
     if (relativeUrl == null || relativeUrl.isEmpty) return '';
     if (relativeUrl.startsWith('http')) return relativeUrl;
-    // Converts "/static/uploads/..." → "http://192.168.1.85:5001/static/uploads/..."
     return '$_serverRoot$relativeUrl';
-  }
-
-  String _formatDate(String? isoDate) {
-    if (isoDate == null) return 'Unknown date';
-    try {
-      final date = DateTime.parse(isoDate);
-      return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
-    } catch (_) {
-      return isoDate;
-    }
   }
 
   @override
@@ -98,44 +99,48 @@ class _TipsScreenState extends State<TipsScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         foregroundColor: colorLogoGreen,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: _fetchTips,
-            tooltip: 'Refresh Tips',
-          ),
-        ],
       ),
       body: Column(
         children: [
-          // Category Filter
-          SizedBox(
-            height: 50,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              itemCount: _categories.length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (context, index) {
-                final cat = _categories[index];
-                final isSelected = cat == _selectedCategory;
-                return FilterChip(
-                  label: Text(cat),
-                  selected: isSelected,
-                  onSelected: (_) {
-                    setState(() => _selectedCategory = cat);
-                    _fetchTips();
-                  },
-                  selectedColor: colorCardGreen,
-                  checkmarkColor: colorLogoGreen,
-                  labelStyle: TextStyle(
-                    color: isSelected ? colorLogoGreen : Colors.grey[700],
-                    fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
-                  ),
-                );
-              },
+          // 🔍 Search Bar
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: TextField(
+              controller: _searchController,
+              decoration: InputDecoration(
+                hintText: 'Search tips...',
+                prefixIcon: const Icon(Icons.search, color: Colors.grey),
+                suffixIcon: _searchQuery.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, color: Colors.grey),
+                        onPressed: () {
+                          _searchController.clear();
+                          setState(() => _searchQuery = '');
+                        },
+                      )
+                    : null,
+                filled: true,
+                fillColor: Colors.grey[100],
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              ),
+              textInputAction: TextInputAction.search,
             ),
           ),
+
+          // Result Count
+          if (_searchQuery.isNotEmpty && !_isLoading)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Text(
+                '${_filteredTips.length} result${_filteredTips.length == 1 ? '' : 's'} for "$_searchQuery"',
+                style: TextStyle(fontSize: 12, color: Colors.grey[600]),
+              ),
+            ),
+
           const Divider(height: 1),
 
           // Content Area
@@ -169,33 +174,42 @@ class _TipsScreenState extends State<TipsScreen> {
                           ),
                         ),
                       )
-                    : _tips.isEmpty
+                    : _filteredTips.isEmpty
                         ? Center(
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.lightbulb_outline, size: 64, color: Colors.grey[400]),
+                                Icon(
+                                  _searchQuery.isEmpty ? Icons.lightbulb_outline : Icons.search_off,
+                                  size: 64,
+                                  color: Colors.grey[400],
+                                ),
                                 const SizedBox(height: 16),
                                 Text(
-                                  'No tips available yet',
+                                  _searchQuery.isEmpty
+                                      ? 'No tips available yet'
+                                      : 'No tips found for "$_searchQuery"',
                                   style: TextStyle(color: Colors.grey[600]),
+                                  textAlign: TextAlign.center,
                                 ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Check back soon for farming insights!',
-                                  style: TextStyle(color: Colors.grey[500], fontSize: 13),
-                                ),
+                                if (_searchQuery.isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  TextButton(
+                                    onPressed: () {
+                                      _searchController.clear();
+                                      setState(() => _searchQuery = '');
+                                    },
+                                    child: const Text('Clear search'),
+                                  ),
+                                ],
                               ],
                             ),
                           )
-                        : RefreshIndicator(
-                            onRefresh: _fetchTips,
-                            child: ListView.separated(
-                              padding: const EdgeInsets.all(16),
-                              itemCount: _tips.length,
-                              separatorBuilder: (_, __) => const SizedBox(height: 12),
-                              itemBuilder: (context, index) => _buildTipCard(_tips[index]),
-                            ),
+                        : ListView.separated(
+                            padding: const EdgeInsets.all(16),
+                            itemCount: _filteredTips.length,
+                            separatorBuilder: (_, __) => const SizedBox(height: 12),
+                            itemBuilder: (context, index) => _buildTipCard(_filteredTips[index]),
                           ),
           ),
         ],
@@ -217,31 +231,6 @@ class _TipsScreenState extends State<TipsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: colorCardGreen.withOpacity(0.3),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      tip['category'] ?? 'General',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: colorLogoGreen,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    _formatDate(tip['created_at']),
-                    style: TextStyle(fontSize: 11, color: Colors.grey[600]),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
               Text(
                 tip['title'] ?? 'No Title',
                 style: TextStyle(
@@ -298,31 +287,30 @@ class _TipsScreenState extends State<TipsScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(
-                  color: colorCardGreen.withOpacity(0.4),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  tip['category'] ?? 'General',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: colorLogoGreen,
-                    fontWeight: FontWeight.w600,
+              // ⭕ Close Button: Black X in White Circle (top-right)
+              Align(
+                alignment: Alignment.topRight,
+                child: GestureDetector(
+                  onTap: () => Navigator.pop(context),
+                  child: Container(
+                    width: 32,
+                    height: 32,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.black, width: 1.5),
+                    ),
+                    child: const Icon(
+                      Icons.close,
+                      color: Colors.black,
+                      size: 20,
+                    ),
                   ),
                 ),
               ),
-              const SizedBox(height: 16),
+              const SizedBox(height: 12),
+              
+              // Title
               Text(
                 tip['title'] ?? 'No Title',
                 style: TextStyle(
@@ -331,18 +319,9 @@ class _TipsScreenState extends State<TipsScreen> {
                   color: colorLogoGreen,
                 ),
               ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
-                  const SizedBox(width: 6),
-                  Text(
-                    _formatDate(tip['created_at']),
-                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                  ),
-                ],
-              ),
               const SizedBox(height: 20),
+              
+              // Image (if available)
               if (imageUrl.isNotEmpty) ...[
                 ClipRRect(
                   borderRadius: BorderRadius.circular(12),
@@ -368,6 +347,8 @@ class _TipsScreenState extends State<TipsScreen> {
                 ),
                 const SizedBox(height: 20),
               ],
+              
+              // Content
               Text(
                 tip['content'] ?? 'No content available',
                 style: TextStyle(
@@ -377,20 +358,6 @@ class _TipsScreenState extends State<TipsScreen> {
                 ),
               ),
               const SizedBox(height: 32),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close, size: 18),
-                  label: const Text('Close'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: colorBtnGreen,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ),
             ],
           ),
         ),
