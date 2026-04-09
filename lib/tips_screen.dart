@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'services/api_service.dart';
+import '../services/api_service.dart'; // ⚠️ Adjust path to match your project
 
 class TipsScreen extends StatefulWidget {
   const TipsScreen({super.key});
@@ -14,6 +14,9 @@ class _TipsScreenState extends State<TipsScreen> {
   bool _isLoading = true;
   String? _errorMessage;
   String _selectedCategory = 'All';
+
+  // 🌐 Update this to match your PC's IP or localhost
+  static const String _serverRoot = 'http://192.168.1.85:5001';
 
   static const Color colorLogoGreen = Color(0xFF366000);
   static const Color colorCardGreen = Color(0xFFBCD9A2);
@@ -36,171 +39,52 @@ class _TipsScreenState extends State<TipsScreen> {
   }
 
   Future<void> _fetchTips() async {
+    if (!mounted) return;
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
 
     try {
-      final category = _selectedCategory == 'All' ? null : _selectedCategory;
-      final result = await _api.getAllTips(category: category);
+      final result = await _api.getAllTips(
+        category: _selectedCategory == 'All' ? null : _selectedCategory,
+      );
 
-      if (mounted) {
-        if (result['success'] == true) {
-          setState(() {
-            _tips = List<Map<String, dynamic>>.from(result['data'] ?? []);
-            _isLoading = false;
-          });
-        } else {
-          setState(() {
-            _errorMessage = result['message'];
-            _isLoading = false;
-          });
-        }
-      }
-    } catch (e) {
-      if (mounted) {
+      if (!mounted) return;
+
+      if (result['success'] == true) {
         setState(() {
-          _errorMessage = 'Failed to load tips: $e';
+          _tips = List<Map<String, dynamic>>.from(result['data'] ?? []);
+          _isLoading = false;
+        });
+      } else {
+        setState(() {
+          _errorMessage = result['message'] ?? 'Failed to fetch tips';
           _isLoading = false;
         });
       }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _errorMessage = 'Connection error: $e';
+        _isLoading = false;
+      });
     }
   }
 
-  void _showTipDetails(Map<String, dynamic> tip) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.85,
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-        ),
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // Handle bar
-              Container(
-                width: 40,
-                height: 4,
-                decoration: BoxDecoration(
-                  color: Colors.grey[300],
-                  borderRadius: BorderRadius.circular(2),
-                ),
-              ),
-              const SizedBox(height: 20),
-              
-              // Category badge
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(
-                  color: colorCardGreen.withOpacity(0.4),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  tip['category'] ?? 'General',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: colorLogoGreen,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              
-              // Title
-              Text(
-                tip['title'] ?? 'No Title',
-                style: TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: colorLogoGreen,
-                ),
-              ),
-              const SizedBox(height: 12),
-              
-              // Date
-              Row(
-                children: [
-                  Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
-                  const SizedBox(width: 6),
-                  Text(
-                    _formatDate(tip['created_at']),
-                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              
-              // Image (if available)
-              if (tip['image_url'] != null && tip['image_url'].isNotEmpty) ...[
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
-                  child: Image.network(
-                    tip['image_url'],
-                    height: 200,
-                    width: double.infinity,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      height: 200,
-                      color: Colors.grey[200],
-                      child: Icon(Icons.image_not_supported, color: Colors.grey[400]),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 20),
-              ],
-              
-              // Content
-              Text(
-                tip['content'] ?? 'No content available',
-                style: TextStyle(
-                  fontSize: 15,
-                  color: Colors.grey[800],
-                  height: 1.6,
-                ),
-              ),
-              const SizedBox(height: 32),
-              
-              // Share button
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton.icon(
-                  onPressed: () {
-                    // TODO: Implement share functionality
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Share feature coming soon!')),
-                    );
-                  },
-                  icon: const Icon(Icons.share, size: 18),
-                  label: const Text('Share Tip'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: colorBtnGreen,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
+  // 🖼️ Local helper to fix backend image URLs
+  String _getFullImageUrl(String? relativeUrl) {
+    if (relativeUrl == null || relativeUrl.isEmpty) return '';
+    if (relativeUrl.startsWith('http')) return relativeUrl;
+    // Converts "/static/uploads/..." → "http://192.168.1.85:5001/static/uploads/..."
+    return '$_serverRoot$relativeUrl';
   }
 
   String _formatDate(String? isoDate) {
     if (isoDate == null) return 'Unknown date';
     try {
       final date = DateTime.parse(isoDate);
-      return '${date.day}/${date.month}/${date.year}';
+      return '${date.day.toString().padLeft(2, '0')}/${date.month.toString().padLeft(2, '0')}/${date.year}';
     } catch (_) {
       return isoDate;
     }
@@ -225,22 +109,21 @@ class _TipsScreenState extends State<TipsScreen> {
       body: Column(
         children: [
           // Category Filter
-          Container(
+          SizedBox(
             height: 50,
-            padding: const EdgeInsets.symmetric(vertical: 8),
             child: ListView.separated(
               scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               itemCount: _categories.length,
               separatorBuilder: (_, __) => const SizedBox(width: 8),
               itemBuilder: (context, index) {
-                final category = _categories[index];
-                final isSelected = category == _selectedCategory;
+                final cat = _categories[index];
+                final isSelected = cat == _selectedCategory;
                 return FilterChip(
-                  label: Text(category),
+                  label: Text(cat),
                   selected: isSelected,
-                  onSelected: (selected) {
-                    setState(() => _selectedCategory = category);
+                  onSelected: (_) {
+                    setState(() => _selectedCategory = cat);
                     _fetchTips();
                   },
                   selectedColor: colorCardGreen,
@@ -254,39 +137,42 @@ class _TipsScreenState extends State<TipsScreen> {
             ),
           ),
           const Divider(height: 1),
-          
-          // Tips List
+
+          // Content Area
           Expanded(
             child: _isLoading
                 ? const Center(child: CircularProgressIndicator())
                 : _errorMessage != null
                     ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(Icons.error_outline, size: 48, color: Colors.grey[400]),
-                            const SizedBox(height: 16),
-                            Text(
-                              _errorMessage!,
-                              style: TextStyle(color: Colors.grey[600]),
-                              textAlign: TextAlign.center,
-                            ),
-                            const SizedBox(height: 16),
-                            ElevatedButton(
-                              onPressed: _fetchTips,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: colorBtnGreen,
-                                foregroundColor: Colors.white,
+                        child: Padding(
+                          padding: const EdgeInsets.all(24.0),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.error_outline, size: 48, color: Colors.grey[400]),
+                              const SizedBox(height: 16),
+                              Text(
+                                _errorMessage!,
+                                textAlign: TextAlign.center,
+                                style: TextStyle(color: Colors.grey[600]),
                               ),
-                              child: const Text('Retry'),
-                            ),
-                          ],
+                              const SizedBox(height: 16),
+                              ElevatedButton(
+                                onPressed: _fetchTips,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: colorBtnGreen,
+                                  foregroundColor: Colors.white,
+                                ),
+                                child: const Text('Retry'),
+                              ),
+                            ],
+                          ),
                         ),
                       )
                     : _tips.isEmpty
                         ? Center(
                             child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                              mainAxisSize: MainAxisSize.min,
                               children: [
                                 Icon(Icons.lightbulb_outline, size: 64, color: Colors.grey[400]),
                                 const SizedBox(height: 16),
@@ -308,10 +194,7 @@ class _TipsScreenState extends State<TipsScreen> {
                               padding: const EdgeInsets.all(16),
                               itemCount: _tips.length,
                               separatorBuilder: (_, __) => const SizedBox(height: 12),
-                              itemBuilder: (context, index) {
-                                final tip = _tips[index];
-                                return _buildTipCard(tip);
-                              },
+                              itemBuilder: (context, index) => _buildTipCard(_tips[index]),
                             ),
                           ),
           ),
@@ -321,6 +204,8 @@ class _TipsScreenState extends State<TipsScreen> {
   }
 
   Widget _buildTipCard(Map<String, dynamic> tip) {
+    final imageUrl = _getFullImageUrl(tip['image_url']);
+
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -387,6 +272,124 @@ class _TipsScreenState extends State<TipsScreen> {
                   ),
                   const Icon(Icons.arrow_forward, size: 14, color: colorBtnGreen),
                 ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showTipDetails(Map<String, dynamic> tip) {
+    final imageUrl = _getFullImageUrl(tip['image_url']);
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        height: MediaQuery.of(context).size.height * 0.85,
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: colorCardGreen.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  tip['category'] ?? 'General',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: colorLogoGreen,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                tip['title'] ?? 'No Title',
+                style: TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: colorLogoGreen,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Icon(Icons.calendar_today, size: 14, color: Colors.grey[600]),
+                  const SizedBox(width: 6),
+                  Text(
+                    _formatDate(tip['created_at']),
+                    style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+              if (imageUrl.isNotEmpty) ...[
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.network(
+                    imageUrl,
+                    height: 200,
+                    width: double.infinity,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Container(
+                        height: 200,
+                        color: Colors.grey[200],
+                        child: Center(child: CircularProgressIndicator()),
+                      );
+                    },
+                    errorBuilder: (_, __, ___) => Container(
+                      height: 200,
+                      color: Colors.grey[200],
+                      child: const Icon(Icons.image_not_supported, color: Colors.grey),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
+              Text(
+                tip['content'] ?? 'No content available',
+                style: TextStyle(
+                  fontSize: 15,
+                  color: Colors.grey[800],
+                  height: 1.6,
+                ),
+              ),
+              const SizedBox(height: 32),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () => Navigator.pop(context),
+                  icon: const Icon(Icons.close, size: 18),
+                  label: const Text('Close'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: colorBtnGreen,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
               ),
             ],
           ),

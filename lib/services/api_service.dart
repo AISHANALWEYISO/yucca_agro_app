@@ -403,3 +403,61 @@ class ApiService {
     }
   }
 }
+  // ─────────────────────────────────────────────────────────────────────────
+  //  TIPS ✅ Simple & Error-Free
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /// Get base URL (avoids getter issues in string interpolation)
+  String _getBase() {
+    if (kIsWeb) return 'http://localhost:5001/api';
+    if (Platform.isAndroid) return 'http://192.168.1.85:5001/api';
+    return 'http://localhost:5001/api';
+  }
+
+  /// Fetch all tips, optionally filtered by category
+  Future<Map<String, dynamic>> getAllTips({String? category}) async {
+    try {
+      final base = _getBase();
+      final url = category != null && category != 'All'
+          ? '$base/?category=$category'
+          : '$base/';
+
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return {'success': false, 'message': 'Failed to fetch tips'};
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: $e'};
+    }
+  }
+
+  /// Fetch a single tip by ID
+  Future<Map<String, dynamic>> getTipById(int tipId) async {
+    try {
+      final base = _getBase();
+      final response = await http.get(
+        Uri.parse('$base/$tipId'),
+        headers: {'Content-Type': 'application/json'},
+      ).timeout(const Duration(seconds: 15));
+
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return {'success': false, 'message': 'Tip not found'};
+    } catch (e) {
+      return {'success': false, 'message': 'Connection error: $e'};
+    }
+  }
+
+  /// Helper: Convert backend relative image URL to full URL for Flutter
+  String getFullImageUrl(String? relativeUrl) {
+    if (relativeUrl == null || relativeUrl.isEmpty) return '';
+    if (relativeUrl.startsWith('http')) return relativeUrl;
+    final base = _getBase().replaceFirst('/api', '');
+    return '$base$relativeUrl';
+  }
