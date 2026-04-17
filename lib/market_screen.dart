@@ -446,3 +446,287 @@ class _MarketScreenState extends State<MarketScreen> {
     );
   }
 }
+
+// lib/screens/list_market_item_screen.dart
+// import 'dart:io';
+// import 'package:flutter/material.dart';
+// import 'package:image_picker/image_picker.dart';
+// import '../services/api_service.dart';
+// import '../utils/auth_service.dart'; // Your auth helper
+
+// class ListMarketItemScreen extends StatefulWidget {
+//   const ListMarketItemScreen({super.key});
+
+//   @override
+//   State<ListMarketItemScreen> createState() => _ListMarketItemScreenState();
+// }
+
+// class _ListMarketItemScreenState extends State<ListMarketItemScreen> {
+//   final _formKey = GlobalKey<FormState>();
+//   final _api = ApiService();
+//   final _auth = AuthService();
+
+//   // Form controllers
+//   final _nameCtrl = TextEditingController();
+//   final _descCtrl = TextEditingController();
+//   final _priceCtrl = TextEditingController();
+//   final _quantityCtrl = TextEditingController();
+//   final _locationCtrl = TextEditingController();
+//   String _category = 'Seeds';
+//   String _unit = 'kg';
+//   File? _image;
+//   bool _isSubmitting = false;
+
+//   // 🎨 Colors (match MarketScreen)
+//   static const _primary = Color(0xFF1B5E20);   // Forest Green
+//   static const _accent = Color(0xFFE67E22);    // Pumpkin Orange
+//   static const _bg = Color(0xFFFEFBE8);        // Soft Cream
+
+//   final List<String> _categories = [
+//     'Seeds', 'Tools', 'Fertilizer', 'Pesticides', 'Equipment', 'Produce'
+//   ];
+//   final List<String> _units = ['kg', 'piece', 'liter', 'bag', 'bunch', 'dozen'];
+
+//   @override
+//   void dispose() {
+//     _nameCtrl.dispose(); _descCtrl.dispose(); _priceCtrl.dispose();
+//     _quantityCtrl.dispose(); _locationCtrl.dispose();
+//     super.dispose();
+//   }
+
+//   Future<void> _pickImage() async {
+//     try {
+//       final picker = ImagePicker();
+//       final picked = await picker.pickImage(source: ImageSource.gallery, maxWidth: 1200);
+//       if (picked != null) {
+//         setState(() => _image = File(picked.path));
+//       }
+//     } catch (e) {
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         SnackBar(content: Text('Failed to pick image: $e')),
+//       );
+//     }
+//   }
+
+//   Future<void> _submit() async {
+//     if (!_formKey.currentState!.validate()) return;
+//     if (_image == null) {
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         const SnackBar(content: Text('Please add at least one photo')),
+//       );
+//       return;
+//     }
+
+//     setState(() => _isSubmitting = true);
+
+//     try {
+//       final user = _auth.getCurrentUser(); // { name, phone, location }
+//       final success = await _api.listMarketItem(
+//         name: _nameCtrl.text.trim(),
+//         category: _category,
+//         price: double.parse(_priceCtrl.text),
+//         unit: _unit,
+//         quantity: int.parse(_quantityCtrl.text),
+//         description: _descCtrl.text.trim(),
+//         image: _image!, // File object
+//         sellerPhone: user?['phone'] ?? '',
+//         sellerLocation: _locationCtrl.text.trim().isNotEmpty 
+//             ? _locationCtrl.text.trim() 
+//             : user?['location'] ?? 'Unknown',
+//         sellerName: user?['name'] ?? 'Farmer',
+//       );
+
+//       if (!mounted) return;
+//       if (success) {
+//         ScaffoldMessenger.of(context).showSnackBar(
+//           const SnackBar(
+//             content: Text('🎉 Item listed successfully!'),
+//             backgroundColor: _primary,
+//             duration: Duration(seconds: 3),
+//           ),
+//         );
+//         Navigator.pop(context, true); // Return success to MarketScreen
+//       } else {
+//         throw Exception('Server rejected the listing');
+//       }
+//     } catch (e) {
+//       if (!mounted) return;
+//       ScaffoldMessenger.of(context).showSnackBar(
+//         SnackBar(
+//           content: Text('Failed to list item: $e'),
+//           backgroundColor: Colors.red,
+//         ),
+//       );
+//     } finally {
+//       if (mounted) setState(() => _isSubmitting = false);
+//     }
+//   }
+
+//   @override
+//   Widget build(BuildContext context) {
+//     return Scaffold(
+//       backgroundColor: _bg,
+//       appBar: AppBar(
+//         title: const Text('List an Item'),
+//         backgroundColor: Colors.transparent,
+//         elevation: 0,
+//         foregroundColor: _primary,
+//       ),
+//       body: _isSubmitting
+//           ? const Center(child: CircularProgressIndicator(color: _primary))
+//           : Form(
+//               key: _formKey,
+//               child: ListView(
+//                 padding: const EdgeInsets.all(16),
+//                 children: [
+//                   // 📸 Image Picker
+//                   GestureDetector(
+//                     onTap: _pickImage,
+//                     child: Container(
+//                       height: 200,
+//                       decoration: BoxDecoration(
+//                         color: Colors.grey[200],
+//                         borderRadius: BorderRadius.circular(16),
+//                         border: Border.all(color: _accent, width: 2),
+//                       ),
+//                       child: _image == null
+//                           ? Column(
+//                               mainAxisAlignment: MainAxisAlignment.center,
+//                               children: [
+//                                 Icon(Icons.add_a_photo, size: 48, color: _accent),
+//                                 const SizedBox(height: 8),
+//                                 Text(
+//                                   'Tap to add photo',
+//                                   style: TextStyle(color: Colors.grey[600]),
+//                                 ),
+//                               ],
+//                             )
+//                           : ClipRRect(
+//                               borderRadius: BorderRadius.circular(14),
+//                               child: Image.file(_image!, fit: BoxFit.cover),
+//                             ),
+//                     ),
+//                   ),
+//                   const SizedBox(height: 20),
+
+//                   // 🌾 Item Name
+//                   TextFormField(
+//                     controller: _nameCtrl,
+//                     decoration: _inputDecoration('Item name', Icons.agriculture),
+//                     validator: (v) => v!.trim().length < 3 ? 'Enter a valid name' : null,
+//                   ),
+//                   const SizedBox(height: 16),
+
+//                   // 🏷️ Category & Unit Row
+//                   Row(
+//                     children: [
+//                       Expanded(
+//                         child: DropdownButtonFormField<String>(
+//                           value: _category,
+//                           decoration: _inputDecoration('Category', Icons.category),
+//                           items: _categories.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
+//                           onChanged: (v) => setState(() => _category = v!),
+//                         ),
+//                       ),
+//                       const SizedBox(width: 12),
+//                       Expanded(
+//                         child: DropdownButtonFormField<String>(
+//                           value: _unit,
+//                           decoration: _inputDecoration('Unit', Icons.scale),
+//                           items: _units.map((u) => DropdownMenuItem(value: u, child: Text(u))).toList(),
+//                           onChanged: (v) => setState(() => _unit = v!),
+//                         ),
+//                       ),
+//                     ],
+//                   ),
+//                   const SizedBox(height: 16),
+
+//                   // 💰 Price & Quantity Row
+//                   Row(
+//                     children: [
+//                       Expanded(
+//                         child: TextFormField(
+//                           controller: _priceCtrl,
+//                           keyboardType: TextInputType.number,
+//                           decoration: _inputDecoration('Price (UGX)', Icons.monetization_on),
+//                           validator: (v) => double.tryParse(v ?? '') == null ? 'Invalid price' : null,
+//                         ),
+//                       ),
+//                       const SizedBox(width: 12),
+//                       Expanded(
+//                         child: TextFormField(
+//                           controller: _quantityCtrl,
+//                           keyboardType: TextInputType.number,
+//                           decoration: _inputDecoration('Quantity', Inventory),
+//                           validator: (v) => int.tryParse(v ?? '') == null ? 'Invalid quantity' : null,
+//                         ),
+//                       ),
+//                     ],
+//                   ),
+//                   const SizedBox(height: 16),
+
+//                   // 📝 Description
+//                   TextFormField(
+//                     controller: _descCtrl,
+//                     maxLines: 3,
+//                     decoration: _inputDecoration('Description', Icons.description),
+//                     validator: (v) => v!.trim().length < 10 ? 'Add more details (min 10 chars)' : null,
+//                   ),
+//                   const SizedBox(height: 16),
+
+//                   // 📍 Location
+//                   TextFormField(
+//                     controller: _locationCtrl,
+//                     decoration: _inputDecoration('Location (e.g., Mbarara)', Icons.location_on),
+//                     validator: (v) => v!.trim().length < 3 ? 'Enter a valid location' : null,
+//                   ),
+//                   const SizedBox(height: 24),
+
+//                   // ✅ Submit Button
+//                   SizedBox(
+//                     width: double.infinity,
+//                     height: 52,
+//                     child: ElevatedButton(
+//                       onPressed: _submit,
+//                       style: ElevatedButton.styleFrom(
+//                         backgroundColor: _accent,
+//                         foregroundColor: Colors.white,
+//                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+//                         elevation: 2,
+//                       ),
+//                       child: const Text('🌱 List Item for Sale', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+//                     ),
+//                   ),
+//                   const SizedBox(height: 12),
+//                   TextButton(
+//                     onPressed: () => Navigator.pop(context),
+//                     child: Text('Cancel', style: TextStyle(color: Colors.grey[600])),
+//                   ),
+//                 ],
+//               ),
+//             ),
+//     );
+//   }
+
+//   InputDecoration _inputDecoration(String label, IconData icon) {
+//     return InputDecoration(
+//       labelText: label,
+//       prefixIcon: Icon(icon, color: _accent),
+//       filled: true,
+//       fillColor: Colors.white,
+//       border: OutlineInputBorder(
+//         borderRadius: BorderRadius.circular(14),
+//         borderSide: BorderSide(color: Colors.grey[300]!),
+//       ),
+//       enabledBorder: OutlineInputBorder(
+//         borderRadius: BorderRadius.circular(14),
+//         borderSide: BorderSide(color: Colors.grey[300]!),
+//       ),
+//       focusedBorder: OutlineInputBorder(
+//         borderRadius: BorderRadius.circular(14),
+//         borderSide: const BorderSide(color: _accent, width: 2),
+//       ),
+//       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+//     );
+//   }
+// }

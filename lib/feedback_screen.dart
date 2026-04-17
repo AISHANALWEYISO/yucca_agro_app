@@ -137,7 +137,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                 children: [
                   Icon(Icons.email, size: 18, color: colorLogoGreen),
                   const SizedBox(width: 8),
-                  Text('support@yuccaconsult.com', style: TextStyle(color: colorLogoGreen)),
+                  Text('yuccan.consult.ac@gmail.com', style: TextStyle(color: colorLogoGreen)),
                 ],
               ),
               const SizedBox(height: 8),
@@ -145,7 +145,7 @@ class _FeedbackScreenState extends State<FeedbackScreen> {
                 children: [
                   Icon(Icons.phone, size: 18, color: colorLogoGreen),
                   const SizedBox(width: 8),
-                  Text('+256 XXX XXX XXX', style: TextStyle(color: colorLogoGreen)),
+                  Text('+256 766753527', style: TextStyle(color: colorLogoGreen)),
                 ],
               ),
             ],

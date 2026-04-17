@@ -75,7 +75,7 @@ class _DiseaseScreenState extends State<DiseaseScreen> {
     return Scaffold(
       backgroundColor: _bg,
       appBar: AppBar(
-        title: const Text('Plant Diseases'),
+        title: const Text(' Diseases'),
         backgroundColor: Colors.transparent,
         elevation: 0,
         foregroundColor: _primary,

@@ -1069,6 +1069,10 @@
 //   }
 // }
 
+// soil_scanner_screen.dart
+
+
+// soil_scanner_screen.dart
 import 'dart:io';
 import 'dart:convert';
 import 'dart:typed_data';
@@ -1076,6 +1080,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'services/api_service.dart';
 import 'payment_screen.dart';
@@ -1095,32 +1100,34 @@ class SoilAnalysis {
   final String summary;
 
   SoilAnalysis.fromJson(Map<String, dynamic> j)
-      : healthScore        = j['soil_health_score'],
-        soilType           = j['soil_type'],
-        texture            = j['texture'],
-        colorAnalysis      = j['color_analysis'],
+      : healthScore = j['soil_health_score'],
+        soilType = j['soil_type'],
+        texture = j['texture'],
+        colorAnalysis = j['color_analysis'],
         estimatedNutrients = Map<String, String>.from(j['estimated_nutrients']),
-        recommendedCrops   = (j['recommended_crops'] as List)
-            .map((e) => CropRecommendation.fromJson(e)).toList(),
-        fertilizers        = (j['fertilizers'] as List)
-            .map((e) => Fertilizer.fromJson(e)).toList(),
-        improvementTips    = List<String>.from(j['improvement_tips']),
-        summary            = j['summary'];
+        recommendedCrops = (j['recommended_crops'] as List)
+            .map((e) => CropRecommendation.fromJson(e))
+            .toList(),
+        fertilizers = (j['fertilizers'] as List)
+            .map((e) => Fertilizer.fromJson(e))
+            .toList(),
+        improvementTips = List<String>.from(j['improvement_tips']),
+        summary = j['summary'];
 }
 
 class CropRecommendation {
   final String name, suitability, reason;
   CropRecommendation.fromJson(Map<String, dynamic> j)
-      : name        = j['name'],
+      : name = j['name'],
         suitability = j['suitability'],
-        reason      = j['reason'];
+        reason = j['reason'];
 }
 
 class Fertilizer {
   final String name, type, application;
   Fertilizer.fromJson(Map<String, dynamic> j)
-      : name        = j['name'],
-        type        = j['type'],
+      : name = j['name'],
+        type = j['type'],
         application = j['application'];
 }
 
@@ -1134,29 +1141,111 @@ class SoilApiService {
     return 'http://127.0.0.1:5001/api';
   }
 
+  static Future<String?> _getToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('access_token');
+  }
+
   static Future<SoilAnalysis> analyzeSoil({
     required XFile imageFile,
     required String region,
     required String season,
   }) async {
-    final uri     = Uri.parse('$baseUrl/soil/analyze');
+    final uri = Uri.parse('$baseUrl/soil/analyze');
     final request = http.MultipartRequest('POST', uri);
-    final bytes   = await imageFile.readAsBytes();
 
-    request.files.add(http.MultipartFile.fromBytes('image', bytes, filename: imageFile.name));
+    // Attach JWT auth header
+    final token = await _getToken();
+    if (token != null && token.isNotEmpty) {
+      request.headers['Authorization'] = 'Bearer $token';
+      print('🔑 Auth header attached: Bearer ${token.substring(0, 20)}...');
+    } else {
+      print('⚠️ No auth token found');
+    }
+
+    // Attach image
+    final bytes = await imageFile.readAsBytes();
+    request.files.add(
+      http.MultipartFile.fromBytes('image', bytes, filename: imageFile.name),
+    );
+
+    // Attach form fields
     request.fields['region'] = region;
     request.fields['season'] = season;
 
+    print('📤 Sending request to: $uri');
+    print('📦 Form fields: region=$region, season=$season');
+
+    // Send request
     final streamed = await request.send().timeout(const Duration(seconds: 60));
     final response = await http.Response.fromStream(streamed);
 
+    print('📥 Response status: ${response.statusCode}');
+    if (response.statusCode != 200) {
+      print('❌ Error body: ${response.body}');
+    }
+
     if (response.statusCode == 200) {
       final data = jsonDecode(response.body);
+      print('✅ Analysis successful');
       return SoilAnalysis.fromJson(data['analysis']);
     } else {
       final err = jsonDecode(response.body);
-      throw Exception(err['error'] ?? 'Failed to analyze soil');
+      throw Exception(err['error'] ?? err['message'] ?? 'Failed to analyze soil');
     }
+  }
+
+  // ✅ MOCK DATA FOR TESTING (remove in production)
+  static SoilAnalysis getMockAnalysis(String region, String season) {
+    return SoilAnalysis(
+      healthScore: 78,
+      soilType: 'Loam',
+      texture: 'Medium',
+      colorAnalysis: 'Brown',
+      estimatedNutrients: {
+        'nitrogen': 'Medium',
+        'phosphorus': 'High',
+        'potassium': 'Low',
+        'ph_level': 'optimal',
+      },
+      recommendedCrops: [
+        CropRecommendation(
+          name: 'maize',
+          suitability: 'Excellent',
+          reason: 'Matches soil pH and nutrient profile for $region $season season',
+        ),
+        CropRecommendation(
+          name: 'soybean',
+          suitability: 'Good',
+          reason: 'Tolerates current soil conditions well',
+        ),
+        CropRecommendation(
+          name: 'cotton',
+          suitability: 'Moderate',
+          reason: 'Requires additional potassium for optimal yield',
+        ),
+      ],
+      fertilizers: [
+        Fertilizer(
+          name: 'Urea (46-0-0)',
+          type: 'Chemical',
+          application: 'Apply 50 kg/ha at planting to boost nitrogen',
+        ),
+        Fertilizer(
+          name: 'Well-rotted compost',
+          type: 'Organic',
+          application: 'Mix 5-10 tons/ha before planting to improve structure',
+        ),
+      ],
+      improvementTips: [
+        'Add organic matter to improve soil structure and water retention',
+        'Monitor potassium levels for fruiting crops',
+        'Rotate crops annually to maintain soil fertility',
+        'Ensure proper drainage to prevent waterlogging during $season season',
+      ],
+      summary:
+          'Soil in $region ($season season) shows good health. Maize is the top recommendation. Add potassium-rich fertilizer for best yields.',
+    );
   }
 }
 
@@ -1171,17 +1260,20 @@ class SoilScannerScreen extends StatefulWidget {
 }
 
 class _SoilScannerScreenState extends State<SoilScannerScreen> {
-  static const Color deepGreen  = Color(0xFF2D5016);
+  static const Color deepGreen = Color(0xFF2D5016);
   static const Color lightGreen = Color(0xFF8BC34A);
-  static const Color cream      = Color(0xFFF5F0E8);
+  static const Color cream = Color(0xFFF5F0E8);
 
-  XFile?       _selectedImage;
-  Uint8List?   _imageBytes;
+  XFile? _selectedImage;
+  Uint8List? _imageBytes;
   SoilAnalysis? _analysis;
-  bool         _isLoading      = false;
-  String?      _error;
-  int          _credits        = 0;
-  bool         _checkingCredits = false;
+  bool _isLoading = false;
+  String? _error;
+  int _credits = 99; // ✅ DEBUG: Start with plenty of credits for testing
+  bool _checkingCredits = false;
+
+  // ✅ DEBUG FLAG: Set to true to bypass credit check & use mock data
+  static const bool _debugBypass = true;
 
   String _selectedRegion = 'Central';
   String _selectedSeason = 'Rainy';
@@ -1190,26 +1282,51 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
   final List<String> _seasons = ['Rainy', 'Dry'];
 
   final ImagePicker _picker = ImagePicker();
-  final ApiService  _api    = ApiService();
+  final ApiService _api = ApiService();
 
   @override
   void initState() {
     super.initState();
-    _loadCredits();
+    if (!_debugBypass) {
+      _loadCredits();
+    }
+  }
+
+  @override
+  void dispose() {
+    _selectedImage = null;
+    _imageBytes = null;
+    super.dispose();
   }
 
   Future<void> _loadCredits() async {
+    if (_debugBypass) return;
+    
     setState(() => _checkingCredits = true);
-    final result = await _api.checkSoilScannerCredits();
-    if (mounted) {
-      setState(() {
-        _credits        = result['credits_remaining'] ?? 0;
-        _checkingCredits = false;
-      });
+    try {
+      final result = await _api.checkSoilScannerCredits();
+      if (mounted) {
+        setState(() {
+          _credits = result['credits_remaining'] ?? 0;
+          _checkingCredits = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _error = 'Failed to load credits: $e';
+          _checkingCredits = false;
+        });
+      }
     }
   }
 
   Future<void> _checkCreditsAndAnalyze() async {
+    if (_debugBypass) {
+      _analyzeSoil();
+      return;
+    }
+    
     await _loadCredits();
     if (_credits <= 0) {
       _showNoCreditsDialog();
@@ -1218,7 +1335,6 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
     _analyzeSoil();
   }
 
-  // ✅ Tip REMOVED from this dialog
   void _showNoCreditsDialog() {
     showDialog(
       context: context,
@@ -1262,15 +1378,17 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
   Future<void> _pickImage(ImageSource source) async {
     try {
       final picked = await _picker.pickImage(
-        source: source, imageQuality: 85, maxWidth: 1200,
+        source: source,
+        imageQuality: 85,
+        maxWidth: 1200,
       );
       if (picked == null) return;
       final bytes = await picked.readAsBytes();
       setState(() {
         _selectedImage = picked;
-        _imageBytes    = bytes;
-        _analysis      = null;
-        _error         = null;
+        _imageBytes = bytes;
+        _analysis = null;
+        _error = null;
       });
     } catch (e) {
       setState(() => _error = 'Could not pick image: $e');
@@ -1279,27 +1397,54 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
 
   Future<void> _analyzeSoil() async {
     if (_selectedImage == null) return;
-    setState(() { _isLoading = true; _error = null; });
+    
+    setState(() {
+      _isLoading = true;
+      _error = null;
+    });
+    
     try {
-      final result = await SoilApiService.analyzeSoil(
-        imageFile: _selectedImage!,
-        region:    _selectedRegion,
-        season:    _selectedSeason,
-      );
+      print('🔍 Starting soil analysis...');
+      print('📷 Image: ${_selectedImage!.name}');
+      print('🌍 Region: $_selectedRegion, Season: $_selectedSeason');
+      
+      SoilAnalysis result;
+      
+      if (_debugBypass) {
+        // ✅ Use mock data for instant testing
+        print('🧪 Using mock data (debug mode)');
+        await Future.delayed(const Duration(seconds: 2)); // Simulate API delay
+        result = SoilApiService.getMockAnalysis(_selectedRegion, _selectedSeason);
+      } else {
+        // ✅ Call real backend
+        print('🌐 Calling real backend API');
+        result = await SoilApiService.analyzeSoil(
+          imageFile: _selectedImage!,
+          region: _selectedRegion,
+          season: _selectedSeason,
+        );
+      }
+      
       setState(() {
         _analysis = result;
-        _credits -= 1;
+        if (!_debugBypass) {
+          _credits -= 1;
+        }
       });
+      
+      print('✅ Analysis complete!');
+      
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Analysis complete! $_credits credit(s) remaining.'),
+            content: Text('Analysis complete! ${_debugBypass ? 'Demo' : _credits} credit(s) remaining.'),
             backgroundColor: deepGreen,
             duration: const Duration(seconds: 3),
           ),
         );
       }
     } catch (e) {
+      print('❌ Analysis error: $e');
       setState(() => _error = e.toString().replaceFirst('Exception: ', ''));
     } finally {
       setState(() => _isLoading = false);
@@ -1313,20 +1458,43 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
       appBar: AppBar(
         backgroundColor: deepGreen,
         foregroundColor: Colors.white,
-        title: const Text('Soil Scanner',
-            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20)),
+        title: const Text(
+          'Soil Scanner',
+          style: TextStyle(fontWeight: FontWeight.bold, fontSize: 20),
+        ),
         centerTitle: true,
         elevation: 0,
         actions: [
+          // ✅ Debug indicator
+          if (_debugBypass)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.orange,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'DEBUG',
+                  style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                ),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.only(right: 16),
             child: Row(
               children: [
                 const Icon(Icons.eco, color: Colors.white, size: 18),
                 const SizedBox(width: 4),
-                Text('$_credits',
-                    style: const TextStyle(
-                        fontWeight: FontWeight.bold, fontSize: 16, color: Colors.white)),
+                Text(
+                  '$_credits',
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                    color: Colors.white,
+                  ),
+                ),
               ],
             ),
           ),
@@ -1372,9 +1540,11 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
           const SizedBox(width: 8),
           Expanded(
             child: Text(
-              _credits > 0
-                  ? 'You have $_credits soil scan credit(s) available'
-                  : 'No credits remaining - buy credits to continue',
+              _debugBypass
+                  ? '🧪 Debug Mode: Unlimited scans'
+                  : _credits > 0
+                      ? 'You have $_credits soil scan credit(s) available'
+                      : 'No credits remaining - buy credits to continue',
               style: TextStyle(
                 fontSize: 13,
                 color: _credits > 0 ? Colors.green[800] : Colors.orange[800],
@@ -1382,7 +1552,7 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
               ),
             ),
           ),
-          if (_credits == 0)
+          if (!_debugBypass && _credits == 0)
             TextButton(
               onPressed: _showNoCreditsDialog,
               child: const Text('Buy Now', style: TextStyle(fontSize: 12)),
@@ -1397,14 +1567,18 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
       children: [
         Expanded(
           child: _buildDropdown(
-            label: 'Region', value: _selectedRegion, items: _regions,
+            label: 'Region',
+            value: _selectedRegion,
+            items: _regions,
             onChanged: (v) => setState(() => _selectedRegion = v!),
           ),
         ),
         const SizedBox(width: 12),
         Expanded(
           child: _buildDropdown(
-            label: 'Season', value: _selectedSeason, items: _seasons,
+            label: 'Season',
+            value: _selectedSeason,
+            items: _seasons,
             onChanged: (v) => setState(() => _selectedSeason = v!),
           ),
         ),
@@ -1421,8 +1595,14 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: deepGreen)),
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w700,
+            color: deepGreen,
+          ),
+        ),
         const SizedBox(height: 6),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -1431,15 +1611,25 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: lightGreen.withOpacity(0.5)),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 6, offset: const Offset(0, 2)),
+              BoxShadow(
+                color: Colors.black.withOpacity(0.04),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
             ],
           ),
           child: DropdownButtonHideUnderline(
             child: DropdownButton<String>(
               value: value,
               isExpanded: true,
-              style: const TextStyle(fontSize: 13, color: Color(0xFF1A2B1C), fontWeight: FontWeight.w600),
-              items: items.map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
+              style: const TextStyle(
+                fontSize: 13,
+                color: Color(0xFF1A2B1C),
+                fontWeight: FontWeight.w600,
+              ),
+              items: items
+                  .map((e) => DropdownMenuItem(value: e, child: Text(e)))
+                  .toList(),
               onChanged: onChanged,
             ),
           ),
@@ -1456,7 +1646,11 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
         borderRadius: BorderRadius.circular(20),
         border: Border.all(color: lightGreen, width: 2),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.08), blurRadius: 12, offset: const Offset(0, 4)),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.08),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: _imageBytes != null
@@ -1464,18 +1658,28 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
               children: [
                 ClipRRect(
                   borderRadius: BorderRadius.circular(18),
-                  child: Image.memory(_imageBytes!, fit: BoxFit.cover,
-                      width: double.infinity, height: double.infinity),
+                  child: Image.memory(
+                    _imageBytes!,
+                    fit: BoxFit.cover,
+                    width: double.infinity,
+                    height: double.infinity,
+                  ),
                 ),
                 Positioned(
-                  top: 8, right: 8,
+                  top: 8,
+                  right: 8,
                   child: GestureDetector(
                     onTap: () => setState(() {
-                      _selectedImage = null; _imageBytes = null; _analysis = null;
+                      _selectedImage = null;
+                      _imageBytes = null;
+                      _analysis = null;
                     }),
                     child: Container(
                       padding: const EdgeInsets.all(6),
-                      decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                      decoration: const BoxDecoration(
+                        color: Colors.black54,
+                        shape: BoxShape.circle,
+                      ),
                       child: const Icon(Icons.close, color: Colors.white, size: 18),
                     ),
                   ),
@@ -1487,13 +1691,20 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
               children: [
                 const Icon(Icons.landscape, size: 64, color: lightGreen),
                 const SizedBox(height: 12),
-                const Text('Take or upload a photo of your soil',
-                    style: TextStyle(fontSize: 15, color: Color(0xFF555555), fontWeight: FontWeight.w500)),
+                const Text(
+                  'Take or upload a photo of your soil',
+                  style: TextStyle(
+                    fontSize: 15,
+                    color: Color(0xFF555555),
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
                 const SizedBox(height: 20),
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    if (!kIsWeb) _sourceButton('Camera', () => _pickImage(ImageSource.camera)),
+                    if (!kIsWeb)
+                      _sourceButton('Camera', () => _pickImage(ImageSource.camera)),
                     if (!kIsWeb) const SizedBox(width: 16),
                     _sourceButton('Gallery', () => _pickImage(ImageSource.gallery)),
                   ],
@@ -1508,27 +1719,42 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        decoration: BoxDecoration(color: deepGreen, borderRadius: BorderRadius.circular(30)),
-        child: Text(label,
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600, fontSize: 13)),
+        decoration: BoxDecoration(
+          color: deepGreen,
+          borderRadius: BorderRadius.circular(30),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+            fontSize: 13,
+          ),
+        ),
       ),
     );
   }
 
   Widget _buildAnalyzeButton() {
     return ElevatedButton(
-      onPressed: _checkingCredits ? null : _checkCreditsAndAnalyze,
+      onPressed: _checkingCredits || _debugBypass ? null : _checkCreditsAndAnalyze,
       style: ElevatedButton.styleFrom(
-        backgroundColor: deepGreen, foregroundColor: Colors.white,
+        backgroundColor: deepGreen,
+        foregroundColor: Colors.white,
         padding: const EdgeInsets.symmetric(vertical: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
         elevation: 4,
       ),
       child: _checkingCredits
-          ? const SizedBox(width: 20, height: 20,
-              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-          : const Text('Analyse Soil (1 Credit)',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+          ? const SizedBox(
+              width: 20,
+              height: 20,
+              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2),
+            )
+          : Text(
+              _debugBypass ? '🧪 Test Analysis (Mock)' : 'Analyse Soil (1 Credit)',
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            ),
     );
   }
 
@@ -1539,9 +1765,15 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
         children: [
           const CircularProgressIndicator(color: deepGreen, strokeWidth: 3),
           const SizedBox(height: 16),
-          Text('Analysing your soil...', style: TextStyle(color: Colors.grey[600], fontSize: 15)),
+          Text(
+            _debugBypass ? 'Generating demo analysis...' : 'Analysing your soil...',
+            style: TextStyle(color: Colors.grey[600], fontSize: 15),
+          ),
           const SizedBox(height: 4),
-          Text('This may take a moment', style: TextStyle(color: Colors.grey[400], fontSize: 13)),
+          Text(
+            'This may take a moment',
+            style: TextStyle(color: Colors.grey[400], fontSize: 13),
+          ),
         ],
       ),
     );
@@ -1560,7 +1792,12 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
         children: [
           const Icon(Icons.error_outline, color: Colors.red),
           const SizedBox(width: 8),
-          Expanded(child: Text(_error!, style: const TextStyle(color: Colors.red))),
+          Expanded(
+            child: Text(
+              _error!,
+              style: const TextStyle(color: Colors.red),
+            ),
+          ),
         ],
       ),
     );
@@ -1588,8 +1825,10 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
         const SizedBox(height: 24),
         OutlinedButton(
           onPressed: () => setState(() {
-            _selectedImage = null; _imageBytes = null; _analysis = null;
-            _loadCredits();
+            _selectedImage = null;
+            _imageBytes = null;
+            _analysis = null;
+            if (!_debugBypass) _loadCredits();
           }),
           style: OutlinedButton.styleFrom(
             foregroundColor: deepGreen,
@@ -1597,26 +1836,38 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
             padding: const EdgeInsets.symmetric(vertical: 14),
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           ),
-          child: const Text('Scan Another Sample', style: TextStyle(fontWeight: FontWeight.w600)),
+          child: const Text(
+            'Scan Another Sample',
+            style: TextStyle(fontWeight: FontWeight.w600),
+          ),
         ),
       ],
     );
   }
 
   Widget _buildHealthScore(int score) {
-    final color = score >= 70 ? const Color(0xFF4CAF50)
-        : score >= 40 ? const Color(0xFFFF9800) : const Color(0xFFF44336);
+    final color = score >= 70
+        ? const Color(0xFF4CAF50)
+        : score >= 40
+            ? const Color(0xFFFF9800)
+            : const Color(0xFFF44336);
     final label = score >= 70 ? 'Healthy' : score >= 40 ? 'Moderate' : 'Poor';
 
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         gradient: const LinearGradient(
-            colors: [Color(0xFF2D5016), Color(0xFF4CAF50)],
-            begin: Alignment.topLeft, end: Alignment.bottomRight),
+          colors: [Color(0xFF2D5016), Color(0xFF4CAF50)],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
-          BoxShadow(color: deepGreen.withOpacity(0.3), blurRadius: 12, offset: const Offset(0, 4)),
+          BoxShadow(
+            color: deepGreen.withOpacity(0.3),
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
       child: Row(
@@ -1625,15 +1876,23 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
             alignment: Alignment.center,
             children: [
               SizedBox(
-                width: 80, height: 80,
+                width: 80,
+                height: 80,
                 child: CircularProgressIndicator(
-                  value: score / 100, strokeWidth: 7,
+                  value: score / 100,
+                  strokeWidth: 7,
                   backgroundColor: Colors.white24,
                   valueColor: AlwaysStoppedAnimation<Color>(color),
                 ),
               ),
-              Text('$score',
-                  style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+              Text(
+                '$score',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ],
           ),
           const SizedBox(width: 20),
@@ -1641,11 +1900,24 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text('Soil Health Score', style: TextStyle(color: Colors.white70, fontSize: 13)),
+                const Text(
+                  'Soil Health Score',
+                  style: TextStyle(color: Colors.white70, fontSize: 13),
+                ),
                 const SizedBox(height: 4),
-                Text(label, style: TextStyle(color: color, fontSize: 24, fontWeight: FontWeight.bold)),
+                Text(
+                  label,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                const Text('out of 100', style: TextStyle(color: Colors.white54, fontSize: 12)),
+                const Text(
+                  'out of 100',
+                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                ),
               ],
             ),
           ),
@@ -1659,11 +1931,11 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
       title: 'Soil Profile',
       child: Column(
         children: [
-          _infoRow('Type',           a.soilType),
-          _infoRow('Texture',        a.texture),
+          _infoRow('Type', a.soilType),
+          _infoRow('Texture', a.texture),
           _infoRow('Colour Analysis', a.colorAnalysis),
-          _infoRow('Region',         _selectedRegion),
-          _infoRow('Season',         '$_selectedSeason Season'),
+          _infoRow('Region', _selectedRegion),
+          _infoRow('Season', '$_selectedSeason Season'),
         ],
       ),
     );
@@ -1673,11 +1945,14 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
     return _card(
       title: 'Estimated Nutrients',
       child: Wrap(
-        spacing: 10, runSpacing: 10,
+        spacing: 10,
+        runSpacing: 10,
         children: nutrients.entries.map((e) {
-          final levelColor = e.value == 'High' ? const Color(0xFF4CAF50)
+          final levelColor = e.value == 'High'
+              ? const Color(0xFF4CAF50)
               : e.value == 'Medium' || e.value == 'Neutral'
-                  ? const Color(0xFFFF9800) : const Color(0xFFF44336);
+                  ? const Color(0xFFFF9800)
+                  : const Color(0xFFF44336);
           return Container(
             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             decoration: BoxDecoration(
@@ -1687,11 +1962,23 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
             ),
             child: Column(
               children: [
-                Text(e.key.replaceAll('_', ' ').toUpperCase(),
-                    style: const TextStyle(fontSize: 10, color: Colors.grey, fontWeight: FontWeight.w600)),
+                Text(
+                  e.key.replaceAll('_', ' ').toUpperCase(),
+                  style: const TextStyle(
+                    fontSize: 10,
+                    color: Colors.grey,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 const SizedBox(height: 4),
-                Text(e.value,
-                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: levelColor)),
+                Text(
+                  e.value,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                    color: levelColor,
+                  ),
+                ),
               ],
             ),
           );
@@ -1705,8 +1992,11 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
       title: 'Recommended Crops — $_selectedRegion · $_selectedSeason Season',
       child: Column(
         children: crops.map((c) {
-          final color = c.suitability == 'Excellent' ? const Color(0xFF4CAF50)
-              : c.suitability == 'Good' ? const Color(0xFF8BC34A) : const Color(0xFFFF9800);
+          final color = c.suitability == 'Excellent'
+              ? const Color(0xFF4CAF50)
+              : c.suitability == 'Good'
+                  ? const Color(0xFF8BC34A)
+                  : const Color(0xFFFF9800);
           return Container(
             margin: const EdgeInsets.only(bottom: 10),
             padding: const EdgeInsets.all(14),
@@ -1719,18 +2009,36 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
               children: [
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(8)),
-                  child: Text(c.suitability,
-                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    c.suitability,
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(c.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                      Text(
+                        c.name,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
+                        ),
+                      ),
                       const SizedBox(height: 2),
-                      Text(c.reason, style: TextStyle(color: Colors.grey[600], fontSize: 12)),
+                      Text(
+                        c.reason,
+                        style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                      ),
                     ],
                   ),
                 ),
@@ -1759,20 +2067,37 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
             children: [
               Row(
                 children: [
-                  Text(f.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                  Text(
+                    f.name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 15,
+                    ),
+                  ),
                   const Spacer(),
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                     decoration: BoxDecoration(
-                      color: f.type == 'Organic' ? const Color(0xFF4CAF50) : const Color(0xFF2196F3),
+                      color: f.type == 'Organic'
+                          ? const Color(0xFF4CAF50)
+                          : const Color(0xFF2196F3),
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: Text(f.type, style: const TextStyle(color: Colors.white, fontSize: 11)),
+                    child: Text(
+                      f.type,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                      ),
+                    ),
                   ),
                 ],
               ),
               const SizedBox(height: 6),
-              Text(f.application, style: TextStyle(color: Colors.grey[600], fontSize: 13)),
+              Text(
+                f.application,
+                style: TextStyle(color: Colors.grey[600], fontSize: 13),
+              ),
             ],
           ),
         )).toList(),
@@ -1790,14 +2115,29 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Container(
-                width: 24, height: 24,
+                width: 24,
+                height: 24,
                 alignment: Alignment.center,
-                decoration: const BoxDecoration(color: deepGreen, shape: BoxShape.circle),
-                child: Text('${e.key + 1}',
-                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                decoration: const BoxDecoration(
+                  color: deepGreen,
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  '${e.key + 1}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
               const SizedBox(width: 10),
-              Expanded(child: Text(e.value, style: const TextStyle(fontSize: 14, height: 1.5))),
+              Expanded(
+                child: Text(
+                  e.value,
+                  style: const TextStyle(fontSize: 14, height: 1.5),
+                ),
+              ),
             ],
           ),
         )).toList(),
@@ -1816,10 +2156,19 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('Summary',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: deepGreen)),
+          const Text(
+            'Summary',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+              color: deepGreen,
+            ),
+          ),
           const SizedBox(height: 8),
-          Text(summary, style: const TextStyle(fontSize: 14, height: 1.6, color: Color(0xFF333333))),
+          Text(
+            summary,
+            style: const TextStyle(fontSize: 14, height: 1.6, color: Color(0xFF333333)),
+          ),
         ],
       ),
     );
@@ -1832,14 +2181,24 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
-          BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 10, offset: const Offset(0, 3)),
+          BoxShadow(
+            color: Colors.black.withOpacity(0.06),
+            blurRadius: 10,
+            offset: const Offset(0, 3),
+          ),
         ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title,
-              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: deepGreen)),
+          Text(
+            title,
+            style: const TextStyle(
+              fontWeight: FontWeight.bold,
+              fontSize: 15,
+              color: deepGreen,
+            ),
+          ),
           const SizedBox(height: 12),
           child,
         ],
@@ -1853,9 +2212,19 @@ class _SoilScannerScreenState extends State<SoilScannerScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 120,
-              child: Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 13))),
-          Expanded(child: Text(value, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
+          SizedBox(
+            width: 120,
+            child: Text(
+              label,
+              style: TextStyle(color: Colors.grey[600], fontSize: 13),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13),
+            ),
+          ),
         ],
       ),
     );

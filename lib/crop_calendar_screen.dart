@@ -330,13 +330,13 @@ class _CropCalendarScreenState extends State<CropCalendarScreen>
             child: Column(
               children: [
                 _monthCard(
-                  title: 'Plant This Month',
+                  title: 'Crops to Plant This Month',  // ✅ CHANGED
                   accentColor: plantGreen,
                   child: _chipRow(List<String>.from(data['plant']), plantGreen),
                 ),
                 const SizedBox(height: 12),
                 _monthCard(
-                  title: 'Harvest This Month',
+                  title: 'Crops Ready to Harvest',  // ✅ CHANGED
                   accentColor: harvestAmb,
                   child: _chipRow(List<String>.from(data['harvest']), harvestAmb),
                 ),
